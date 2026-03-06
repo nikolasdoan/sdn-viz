@@ -363,3 +363,47 @@ input[type=range]::-webkit-slider-runnable-track {
   0% { transform: scale(1.4); }
   100% { transform: scale(1); }
 }
+
+/* Capture Audio Button */
+.capture-btn {
+  border-color: #aa00ff;
+}
+
+.capture-btn:hover {
+  background: #aa00ff;
+  color: white;
+  box-shadow: 0 0 15px #aa00ff;
+}
+
+.capture-btn.active {
+  border-color: #ff3333;
+  color: #ff3333;
+  animation: pulse-border-capture 1.5s infinite;
+}
+
+.capture-btn.active:hover {
+  background: #ff3333;
+  color: white;
+  box-shadow: 0 0 15px #ff3333;
+}
+
+@keyframes pulse-border-capture {
+  0% { box-shadow: 0 0 5px #ff3333; }
+  50% { box-shadow: 0 0 15px #ff3333; }
+  100% { box-shadow: 0 0 5px #ff3333; }
+}
+
+.capture-listening {
+  color: #aa00ff !important;
+  animation: listening-pulse 2s infinite;
+}
+
+.capture-playing {
+  color: #00ff66 !important;
+}
+
+@keyframes listening-pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}

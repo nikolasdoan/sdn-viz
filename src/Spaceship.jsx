@@ -1,24 +1,22 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Trail } from '@react-three/drei';
 import * as THREE from 'three';
 import { engine } from './AudioEngine';
 import { gameState } from './GameState';
 
-// Manual exhaust trail config
-const EXHAUST_TRAIL_LEN = 25;
-const EXHAUST_SPEED = 60; // how fast exhaust particles drift backward
-
 export function Spaceship() {
     const shipRef = useRef();
     const leftThrusterRef = useRef();
     const rightThrusterRef = useRef();
     const explosionFlashRef = useRef();
-    const exhaustGroupRef = useRef();
     const { camera } = useThree();
 
-    const [isInvincible, setIsInvincible] = useState(false);
+    const isInvincible = useRef(false);
     const explosionIntensity = useRef(0);
+
+    // Cached vectors to avoid GC pressure from per-frame allocations
+    const _camTarget = useRef(new THREE.Vector3());
 
     // Input state — added Space for shooting
     const keys = useRef({
@@ -36,23 +34,6 @@ export function Spaceship() {
     const shootCooldown = useRef(0);
     const SHOOT_RATE = 0.12; // seconds between shots
 
-    // Exhaust trail data: 3 streams (left, right, center) x EXHAUST_TRAIL_LEN dots
-    const exhaustData = useMemo(() => {
-        const streams = [
-            { offset: [-0.4, 0, 1.1] },   // left engine
-            { offset: [0.4, 0, 1.1] },     // right engine
-            { offset: [0, -0.05, 1.2] },   // center engine
-        ];
-        return streams.map(stream => ({
-            offset: stream.offset,
-            positions: Array.from({ length: EXHAUST_TRAIL_LEN }, () => ({
-                pos: new THREE.Vector3(0, 0, -9999),
-                age: 999,
-            })),
-            spawnIndex: 0,
-            spawnTimer: 0,
-        }));
-    }, []);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -70,7 +51,7 @@ export function Spaceship() {
         window.addEventListener('ship-explosion', onExplode);
 
         const unsubscribe = gameState.subscribe((state) => {
-            setIsInvincible(state.isInvincible);
+            isInvincible.current = state.isInvincible;
         });
 
         return () => {
@@ -99,26 +80,53 @@ export function Spaceship() {
 
     // Neon edge strip geometry
     const neonStrips = useMemo(() => [
-        // Hull top edge — forward-facing neon line
-        { geo: new THREE.BoxGeometry(1.3, 0.05, 0.05), pos: [0, 0.22, -1.0], color: "#00ffff", intensity: 3 },
+        // Hull top edge — forward-facing neon line (nose)
+        { geo: new THREE.BoxGeometry(1.3, 0.06, 0.06), pos: [0, 0.22, -1.0], color: "#00ffff", intensity: 4 },
+        // Hull rear edge
+        { geo: new THREE.BoxGeometry(1.3, 0.06, 0.06), pos: [0, 0.22, 1.0], color: "#00ffff", intensity: 3 },
+        // Hull left side edge (full length)
+        { geo: new THREE.BoxGeometry(0.06, 0.06, 2.1), pos: [-0.62, 0.22, 0], color: "#00ffff", intensity: 3 },
+        // Hull right side edge (full length)
+        { geo: new THREE.BoxGeometry(0.06, 0.06, 2.1), pos: [0.62, 0.22, 0], color: "#00ffff", intensity: 3 },
+        // Hull bottom left side edge
+        { geo: new THREE.BoxGeometry(0.06, 0.06, 2.1), pos: [-0.62, -0.22, 0], color: "#00aaff", intensity: 2.5 },
+        // Hull bottom right side edge
+        { geo: new THREE.BoxGeometry(0.06, 0.06, 2.1), pos: [0.62, -0.22, 0], color: "#00aaff", intensity: 2.5 },
         // Left wing leading edge
-        { geo: new THREE.BoxGeometry(0.05, 0.05, 1.05), pos: [-2.38, -0.05, 0.2], color: "#00ffff", intensity: 2.5 },
+        { geo: new THREE.BoxGeometry(2.05, 0.06, 0.06), pos: [-1.4, -0.05, -0.3], color: "#00ffff", intensity: 3 },
         // Right wing leading edge
-        { geo: new THREE.BoxGeometry(0.05, 0.05, 1.05), pos: [2.38, -0.05, 0.2], color: "#00ffff", intensity: 2.5 },
+        { geo: new THREE.BoxGeometry(2.05, 0.06, 0.06), pos: [1.4, -0.05, -0.3], color: "#00ffff", intensity: 3 },
+        // Left wing trailing edge
+        { geo: new THREE.BoxGeometry(2.05, 0.06, 0.06), pos: [-1.4, -0.05, 0.7], color: "#00aaff", intensity: 2 },
+        // Right wing trailing edge
+        { geo: new THREE.BoxGeometry(2.05, 0.06, 0.06), pos: [1.4, -0.05, 0.7], color: "#00aaff", intensity: 2 },
+        // Left wing outer edge (spanwise)
+        { geo: new THREE.BoxGeometry(0.06, 0.06, 1.05), pos: [-2.38, -0.05, 0.2], color: "#00ffff", intensity: 3 },
+        // Right wing outer edge (spanwise)
+        { geo: new THREE.BoxGeometry(0.06, 0.06, 1.05), pos: [2.38, -0.05, 0.2], color: "#00ffff", intensity: 3 },
         // Left wing tip glow
-        { geo: new THREE.BoxGeometry(0.15, 0.08, 0.15), pos: [-2.4, 0.0, -0.3], color: "#ff007f", intensity: 4 },
+        { geo: new THREE.BoxGeometry(0.18, 0.1, 0.18), pos: [-2.4, 0.0, -0.3], color: "#ff007f", intensity: 5 },
         // Right wing tip glow
-        { geo: new THREE.BoxGeometry(0.15, 0.08, 0.15), pos: [2.4, 0.0, -0.3], color: "#ff007f", intensity: 4 },
-        // Underglow strip (centered under hull)
-        { geo: new THREE.BoxGeometry(1.0, 0.04, 1.8), pos: [0, -0.22, 0], color: "#00aaff", intensity: 2 },
-        // Left fin edge
-        { geo: new THREE.BoxGeometry(0.12, 0.62, 0.04), pos: [-2.4, 0.2, 0.1], color: "#00ffff", intensity: 2 },
-        // Right fin edge
-        { geo: new THREE.BoxGeometry(0.12, 0.62, 0.04), pos: [2.4, 0.2, 0.1], color: "#00ffff", intensity: 2 },
+        { geo: new THREE.BoxGeometry(0.18, 0.1, 0.18), pos: [2.4, 0.0, -0.3], color: "#ff007f", intensity: 5 },
+        // Underglow strip (centered under hull, wider)
+        { geo: new THREE.BoxGeometry(1.2, 0.04, 2.0), pos: [0, -0.22, 0], color: "#00aaff", intensity: 2.5 },
+        // Left fin front edge
+        { geo: new THREE.BoxGeometry(0.12, 0.62, 0.06), pos: [-2.4, 0.2, 0.1], color: "#00ffff", intensity: 3 },
+        // Right fin front edge
+        { geo: new THREE.BoxGeometry(0.12, 0.62, 0.06), pos: [2.4, 0.2, 0.1], color: "#00ffff", intensity: 3 },
+        // Left fin top edge
+        { geo: new THREE.BoxGeometry(0.12, 0.06, 0.8), pos: [-2.4, 0.5, 0.5], color: "#ff007f", intensity: 3 },
+        // Right fin top edge
+        { geo: new THREE.BoxGeometry(0.12, 0.06, 0.8), pos: [2.4, 0.5, 0.5], color: "#ff007f", intensity: 3 },
+        // Nose tip accent
+        { geo: new THREE.BoxGeometry(0.3, 0.15, 0.1), pos: [0, 0.1, -1.05], color: "#00ffff", intensity: 5 },
     ], []);
 
-    useFrame((state, delta) => {
+    useFrame((state, rawDelta) => {
         if (!shipRef.current) return;
+
+        // Clamp delta to prevent huge jumps after frame spikes (kills, explosions)
+        const delta = Math.min(rawDelta, 0.05); // cap at 50ms (~20fps minimum)
 
         const time = state.clock.getElapsedTime();
         const bass = engine.averageBass || 0;
@@ -127,20 +135,20 @@ export function Spaceship() {
         gameState.updateShipPosition(shipRef.current.position);
         gameState.updateFrame(delta, edmState);
 
-        // 1. Collision Detection (Missiles + Enemy Lasers)
+        // 1. Collision Detection (Missiles + Enemy Lasers) — no closures
         const shipPos = shipRef.current.position;
-        gameState.missilePositions.forEach((missilePos) => {
-            const dist = shipPos.distanceTo(missilePos);
-            if (dist < 1.8) {
+        for (const missilePos of gameState.missilePositions.values()) {
+            if (shipPos.distanceTo(missilePos) < 1.8) {
                 gameState.takeDamage();
+                break; // only one hit per frame
             }
-        });
-        gameState.enemyLaserPositions.forEach((laserPos) => {
-            const dist = shipPos.distanceTo(laserPos);
-            if (dist < 1.5) {
+        }
+        for (const laserPos of gameState.enemyLaserPositions.values()) {
+            if (shipPos.distanceTo(laserPos) < 1.5) {
                 gameState.takeDamage();
+                break;
             }
-        });
+        }
 
         // 2. Shooting
         shootCooldown.current -= delta;
@@ -188,7 +196,7 @@ export function Spaceship() {
         shipRef.current.rotation.x = THREE.MathUtils.lerp(shipRef.current.rotation.x, tiltX, 0.1);
 
         // 5. Invincibility Flicker
-        if (isInvincible) {
+        if (isInvincible.current) {
             shipRef.current.visible = Math.floor(time * 20) % 2 === 0;
         } else {
             shipRef.current.visible = true;
@@ -200,8 +208,11 @@ export function Spaceship() {
             explosionFlashRef.current.intensity = explosionIntensity.current * 10;
         }
 
-        let thrusterLengthScale = 0.15 + (bass * 0.6);
-        let thrusterIntensity = 0.4 + (bass * 1.5) + explosionIntensity.current;
+        // Thruster pulsing — reacts to bass like a heartbeat
+        const beatPulse = engine.isBeat ? 2.0 : 0;
+        let thrusterLengthScale = 0.3 + bass * 1.2 + beatPulse;
+        let thrusterIntensity = 1.0 + bass * 4 + beatPulse * 3 + explosionIntensity.current;
+        let thrusterWidth = 1.0 + bass * 0.5;
 
         if (edmState === 'buildup') {
             thrusterLengthScale *= 1.5;
@@ -209,101 +220,37 @@ export function Spaceship() {
         } else if (edmState === 'drop') {
             thrusterLengthScale *= 2.5;
             thrusterIntensity *= 2.5;
+            thrusterWidth *= 1.3;
         }
 
         if (leftThrusterRef.current) {
-            leftThrusterRef.current.scale.set(0.5, thrusterLengthScale, 0.5);
+            leftThrusterRef.current.scale.set(thrusterWidth, thrusterLengthScale, thrusterWidth);
             leftThrusterRef.current.material.emissiveIntensity = thrusterIntensity;
         }
         if (rightThrusterRef.current) {
-            rightThrusterRef.current.scale.set(0.5, thrusterLengthScale, 0.5);
+            rightThrusterRef.current.scale.set(thrusterWidth, thrusterLengthScale, thrusterWidth);
             rightThrusterRef.current.material.emissiveIntensity = thrusterIntensity;
         }
 
-        // 7. Manual Exhaust Trail Update
-        if (exhaustGroupRef.current) {
-            const shipWorldPos = shipRef.current.position;
-            let dotIdx = 0;
-
-            for (let s = 0; s < exhaustData.length; s++) {
-                const stream = exhaustData[s];
-
-                // Spawn new particle
-                stream.spawnTimer += delta;
-                if (stream.spawnTimer > 0.02) {
-                    stream.spawnTimer = 0;
-                    const dot = stream.positions[stream.spawnIndex];
-                    dot.pos.set(
-                        shipWorldPos.x + stream.offset[0],
-                        shipWorldPos.y + stream.offset[1],
-                        shipWorldPos.z + stream.offset[2]
-                    );
-                    dot.age = 0;
-                    stream.spawnIndex = (stream.spawnIndex + 1) % EXHAUST_TRAIL_LEN;
-                }
-
-                // Update all dots: drift backward (+Z) and fade
-                const exhaustSpd = EXHAUST_SPEED + bass * 40;
-                for (let d = 0; d < EXHAUST_TRAIL_LEN; d++) {
-                    const dot = stream.positions[d];
-                    dot.age += delta;
-                    // Drift backward (positive Z = behind the ship in flight direction)
-                    dot.pos.z += exhaustSpd * delta;
-                    // Slight spread based on velocity (opposite direction)
-                    dot.pos.x -= velocity.current.x * delta * 0.3;
-                    dot.pos.y -= velocity.current.y * delta * 0.3;
-
-                    // Update mesh
-                    const mesh = exhaustGroupRef.current.children[dotIdx];
-                    if (mesh) {
-                        mesh.position.copy(dot.pos);
-                        const life = 1 - Math.min(dot.age / 0.8, 1); // fade over 0.8s
-                        mesh.scale.setScalar(Math.max(life * 0.5, 0.02));
-                        mesh.material.opacity = life * 0.9;
-                        mesh.visible = dot.age < 0.8;
-                    }
-                    dotIdx++;
-                }
-            }
-        }
-
-        // 8. Chase Camera
-        const targetCamPos = new THREE.Vector3(
+        // 7. Chase Camera (reuse cached vector to avoid GC)
+        _camTarget.current.set(
             logicalPos.current.x * 0.8,
             logicalPos.current.y + 4,
             shipRef.current.position.z + 10
         );
-        camera.position.lerp(targetCamPos, 0.1);
+        camera.position.lerp(_camTarget.current, 0.1);
         camera.lookAt(logicalPos.current.x, logicalPos.current.y + 1, shipRef.current.position.z - 5);
     });
 
     return (
         <>
-            {/* Exhaust trail dots — world space, outside ship group so they don't bank with it */}
-            <group ref={exhaustGroupRef}>
-                {exhaustData.map((stream, s) =>
-                    Array.from({ length: EXHAUST_TRAIL_LEN }, (_, d) => (
-                        <mesh key={`${s}-${d}`} visible={false}>
-                            <sphereGeometry args={[0.3, 4, 4]} />
-                            <meshStandardMaterial
-                                color="#00ccff"
-                                emissive="#00aaff"
-                                emissiveIntensity={4}
-                                transparent
-                                opacity={0.8}
-                                blending={THREE.AdditiveBlending}
-                                depthWrite={false}
-                            />
-                        </mesh>
-                    ))
-                )}
-            </group>
-
             <group ref={shipRef} position={[0, -4, 5]}>
                 <pointLight ref={explosionFlashRef} color="#ffaa00" distance={10} intensity={0} />
 
-                {/* Ship self-illumination — point light so you can always see the hull */}
-                <pointLight color="#00aaff" distance={8} intensity={1.5} position={[0, 0.5, 0]} />
+                {/* Ship self-illumination — point lights so you can always see the hull */}
+                <pointLight color="#00aaff" distance={12} intensity={3} position={[0, 0.5, 0]} />
+                <pointLight color="#00ffff" distance={6} intensity={2} position={[0, -0.3, -0.5]} />
+                <pointLight color="#ff007f" distance={8} intensity={1.5} position={[0, 0.3, 0.8]} />
 
                 {/* Ship body parts */}
                 {shipParts.map((part, i) => (
@@ -346,16 +293,36 @@ export function Spaceship() {
                     </Trail>
                 </group>
 
-                {/* Left thruster cone */}
-                <mesh ref={leftThrusterRef} position={[-0.4, 0, 1.1]} rotation={[Math.PI / 2, 0, 0]}>
-                    <cylinderGeometry args={[0.08, 0.02, 1, 12]} />
-                    <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.6} blending={THREE.AdditiveBlending} />
+                {/* Left engine nacelle — big horizontal cylinder */}
+                <mesh position={[-0.4, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.3, 0.28, 1.2, 12]} />
+                    <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.2} emissive="#001122" emissiveIntensity={0.3} />
+                </mesh>
+                {/* Left engine nozzle ring */}
+                <mesh position={[-0.4, 0, 1.12]} rotation={[Math.PI / 2, 0, 0]}>
+                    <torusGeometry args={[0.28, 0.04, 8, 16]} />
+                    <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={4} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                </mesh>
+                {/* Left exhaust flame — big, pulsing with bass */}
+                <mesh ref={leftThrusterRef} position={[-0.4, 0, 1.5]} rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.22, 0.05, 1.5, 8]} />
+                    <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
                 </mesh>
 
-                {/* Right thruster cone */}
-                <mesh ref={rightThrusterRef} position={[0.4, 0, 1.1]} rotation={[Math.PI / 2, 0, 0]}>
-                    <cylinderGeometry args={[0.08, 0.02, 1, 12]} />
-                    <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.6} blending={THREE.AdditiveBlending} />
+                {/* Right engine nacelle — big horizontal cylinder */}
+                <mesh position={[0.4, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.3, 0.28, 1.2, 12]} />
+                    <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.2} emissive="#001122" emissiveIntensity={0.3} />
+                </mesh>
+                {/* Right engine nozzle ring */}
+                <mesh position={[0.4, 0, 1.12]} rotation={[Math.PI / 2, 0, 0]}>
+                    <torusGeometry args={[0.28, 0.04, 8, 16]} />
+                    <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={4} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                </mesh>
+                {/* Right exhaust flame — big, pulsing with bass */}
+                <mesh ref={rightThrusterRef} position={[0.4, 0, 1.5]} rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.22, 0.05, 1.5, 8]} />
+                    <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
                 </mesh>
             </group>
         </>

@@ -26,9 +26,22 @@ export class AudioEngine {
     this.chunkDuration = 0.5; // Analyze energy in 0.5 second chunks
     this.duration = 0;
     this.currentTime = 0;
+
+    // Capture mode (system audio)
+    this.isCaptureMode = false;
+    this.captureStream = null;
+
+    // Song detection for capture mode
+    this.songPlaying = false;
+    this.silenceTimer = 0;
+    this.silenceThreshold = 0.02;   // below this = silence
+    this.songStartThreshold = 0.04; // above this = song started
+    this.silenceDuration = 2.5;     // seconds of silence before song is "ended"
+    this.onSongStart = null;        // callback
+    this.onSongEnd = null;          // callback
   }
 
-  // Called when the user clicks Initialize
+  // Called when the user clicks Initialize (file mode)
   init(audioElement) {
     if (this.isInitialized) return;
 
@@ -51,6 +64,77 @@ export class AudioEngine {
     this.timeDataArray = new Uint8Array(this.analyser.fftSize);
 
     this.isInitialized = true;
+    this.isCaptureMode = false;
+  }
+
+  // Called when user clicks Capture Audio (system/tab audio)
+  async initCapture() {
+    // Clean up previous capture if any
+    this.stopCapture();
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    // Request system/tab audio via getDisplayMedia
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,  // required by browser, we ignore it
+      audio: true,
+    });
+
+    // Stop the video track immediately — we only need audio
+    stream.getVideoTracks().forEach(t => t.stop());
+
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      throw new Error('No audio track selected. Make sure to check "Share audio" when picking a tab.');
+    }
+
+    this.captureStream = stream;
+
+    // Create analyser
+    this.analyser = this.audioContext.createAnalyser();
+    this.analyser.fftSize = 1024;
+    this.analyser.smoothingTimeConstant = 0.85;
+
+    this.source = this.audioContext.createMediaStreamSource(stream);
+    this.source.connect(this.analyser);
+    // Don't connect to destination — avoids feedback loop (audio already plays from the source app)
+
+    const bufferLength = this.analyser.frequencyBinCount;
+    this.dataArray = new Uint8Array(bufferLength);
+    this.timeDataArray = new Uint8Array(this.analyser.fftSize);
+
+    this.isInitialized = true;
+    this.isCaptureMode = true;
+    this.songPlaying = false;
+    this.silenceTimer = 0;
+    this.energyMap = [];
+
+    // Listen for the user stopping the share via browser UI
+    audioTracks[0].addEventListener('ended', () => {
+      this.stopCapture();
+      if (this.onSongEnd && this.songPlaying) {
+        this.songPlaying = false;
+        this.onSongEnd();
+      }
+    });
+  }
+
+  stopCapture() {
+    if (this.captureStream) {
+      this.captureStream.getTracks().forEach(t => t.stop());
+      this.captureStream = null;
+    }
+    if (this.isCaptureMode) {
+      this.isInitialized = false;
+      this.isCaptureMode = false;
+      this.songPlaying = false;
+    }
   }
 
   // Pre-analyze an audio file to map out structure (Drops/Buildups)
@@ -105,10 +189,14 @@ export class AudioEngine {
   }
 
   update() {
-    if (!this.isInitialized || !this.audioElement) return;
+    if (!this.isInitialized) return;
+    // File mode needs audioElement; capture mode doesn't
+    if (!this.isCaptureMode && !this.audioElement) return;
 
-    this.currentTime = this.audioElement.currentTime;
-    this.duration = this.audioElement.duration || 0;
+    if (!this.isCaptureMode) {
+      this.currentTime = this.audioElement.currentTime;
+      this.duration = this.audioElement.duration || 0;
+    }
 
     // --- 1. Update Real-Time FFT & Time Domain Data ---
     this.analyser.getByteFrequencyData(this.dataArray);
@@ -143,8 +231,22 @@ export class AudioEngine {
     }
     this.prevBass = this.averageBass;
 
+    // --- Song Detection (capture mode only) ---
+    if (this.isCaptureMode) {
+      this._detectSong();
+    }
+
     // --- 2. Update EDM State Machine ---
-    if (this.energyMap.length > 0 && this.audioElement) {
+    if (this.isCaptureMode) {
+      // In capture mode, use real-time energy for state since we have no pre-analyzed map
+      if (this.averageOverall > 0.35) {
+        this.currentState = 'drop';
+      } else if (this.averageOverall > 0.15) {
+        this.currentState = 'buildup';
+      } else {
+        this.currentState = 'chill';
+      }
+    } else if (this.energyMap.length > 0 && this.audioElement) {
       // Find which chunk we are currently in based on playback time
       const currentTime = this.audioElement.currentTime;
       const currentChunkIndex = Math.floor(currentTime / this.chunkDuration);
@@ -173,6 +275,31 @@ export class AudioEngine {
         } else {
           this.currentState = 'chill'; // Intro, breakdown, verse
         }
+      }
+    }
+  }
+
+  _detectSong() {
+    const energy = this.averageOverall;
+
+    if (!this.songPlaying) {
+      // Waiting for a song to start
+      if (energy > this.songStartThreshold) {
+        this.songPlaying = true;
+        this.silenceTimer = 0;
+        if (this.onSongStart) this.onSongStart();
+      }
+    } else {
+      // Song is playing — watch for silence
+      if (energy < this.silenceThreshold) {
+        this.silenceTimer += 1 / 60;
+        if (this.silenceTimer >= this.silenceDuration) {
+          this.songPlaying = false;
+          this.silenceTimer = 0;
+          if (this.onSongEnd) this.onSongEnd();
+        }
+      } else {
+        this.silenceTimer = 0;
       }
     }
   }

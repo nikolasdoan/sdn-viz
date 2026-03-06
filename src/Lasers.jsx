@@ -3,10 +3,11 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { engine } from './AudioEngine';
 
-// Color Palette: Ethereal Deep Space
-const COLOR_BASS = new THREE.Color("#0033ff");   // Deep Ocean Blue
-const COLOR_MID = new THREE.Color("#00ff66");    // Emerald Green 
-const COLOR_HIGH = new THREE.Color("#ffffff");   // Crisp White
+// Color Palette: Vibrant Neon Space
+const COLOR_BASS = new THREE.Color("#6600ff");   // Electric Purple
+const COLOR_MID = new THREE.Color("#ff0088");    // Hot Pink
+const COLOR_HIGH = new THREE.Color("#ffaa00");   // Golden Orange
+const COLOR_DROP = new THREE.Color("#00ffcc");   // Teal Cyan
 
 function HyperspeedBeams({ count = 60, baseLength = 80 }) {
     const groupRef = useRef();
@@ -18,15 +19,12 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
     // Create an array of laser beam meshes
     const lasersData = useMemo(() => {
         return Array.from({ length: count }, (_, i) => {
-            // Distribute stars in a massive long bounding box
-            let x = (Math.random() - 0.5) * 150;
-            let y = (Math.random() - 0.5) * 150;
-
-            // Keep the center cockpit area clear so they zip PAST us, not THROUGH us
-            if (Math.abs(x) < 15 && Math.abs(y) < 15) {
-                x += (x > 0 ? 15 : -15);
-                y += (y > 0 ? 15 : -15);
-            }
+            // Distribute beams far outside the playing field (player moves ±80x, ±50y)
+            // Place beams in outer ring only: 120-250 range from center
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 120 + Math.random() * 130;
+            let x = Math.cos(angle) * radius;
+            let y = Math.sin(angle) * radius;
 
             const z = (Math.random() - 0.5) * 500; // -250 to 250 initial distribution
 
@@ -71,12 +69,18 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
         // Apply Time-based forward movement (+Z)
         cumulativeTime.current += delta * flightSpeed;
 
-        // Determine the "base" color to use based on the loudest frequency
+        // Determine the "base" color to use based on the loudest frequency + EDM state
         let dominantColor = COLOR_BASS;
         let dominantIntensity = bass;
         let dominantScale = bass;
 
-        if (mid > bass && mid > high) {
+        if (edmState === 'drop') {
+            // During drops, cycle between teal and gold for maximum spectacle
+            const cycle = Math.sin(cumulativeTime.current * 0.05) * 0.5 + 0.5;
+            dominantColor = COLOR_DROP.clone().lerp(COLOR_HIGH, cycle);
+            dominantIntensity = Math.max(bass, mid, high);
+            dominantScale = dominantIntensity;
+        } else if (mid > bass && mid > high) {
             dominantColor = COLOR_MID;
             dominantIntensity = mid;
             dominantScale = mid;
@@ -153,7 +157,7 @@ export function Lasers() {
     return (
         <group>
             {/* The infinite tunnel of passing light trails */}
-            <HyperspeedBeams count={100} baseLength={150} />
+            <HyperspeedBeams count={80} baseLength={350} />
         </group>
     );
 }

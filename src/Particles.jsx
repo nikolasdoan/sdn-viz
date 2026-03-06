@@ -57,31 +57,31 @@ const vertexShader = `
 const fragmentShader = `
   uniform vec3 uColorA; // Deep Space Blue
   uniform vec3 uColorB; // Stardust Magenta
+  uniform vec3 uColorC; // Hot Pink / Gold accent
   uniform float uMid;
-  
+  uniform float uTime;
+
   varying float vBassAmount;
   varying vec3 vPosition;
-  
+
   void main() {
-    // Distance from center of point gl_PointCoord goes from [0,0] to [1,1]
     vec2 cxy = 2.0 * gl_PointCoord - 1.0;
     float r = dot(cxy, cxy);
-    
-    // Soft circle shape for glowing stars
+
     if (r > 1.0) {
-        discard; 
+        discard;
     }
-    
-    // Create a smooth glowing edge
+
     float alpha = exp(-r * 3.0);
-    
-    // Mix colors based on position and melody
+
+    // Cycle through 3 colors based on position, time, and audio
     float distanceMix = length(vPosition.xy) / 100.0;
-    vec3 finalColor = mix(uColorA, uColorB, distanceMix + uMid * 0.5);
-    
-    // Glow multiplier (Bloom will catch values > 1.0)
-    // When bass hits, the stars flash brightly
-    float brightness = 1.0 + (vBassAmount * 4.0); 
+    float timeCycle = sin(uTime * 0.3 + vPosition.z * 0.01) * 0.5 + 0.5;
+
+    vec3 colorAB = mix(uColorA, uColorB, distanceMix + uMid * 0.5);
+    vec3 finalColor = mix(colorAB, uColorC, timeCycle * 0.4 + vBassAmount * 0.3);
+
+    float brightness = 1.0 + (vBassAmount * 4.0);
 
     gl_FragColor = vec4(finalColor * brightness, alpha * 0.8);
   }
@@ -90,8 +90,7 @@ const fragmentShader = `
 export function Particles() {
     const pointsRef = useRef();
 
-    // Massive particle count for deep space depth
-    const count = 40000;
+    const count = 5000;
 
     // We store cumulative time ourselves so we can dynamically change speed without 
     // jumping positions wildly when speed suddenly multiplies
@@ -140,7 +139,8 @@ export function Particles() {
         uBass: { value: 0 },
         uMid: { value: 0 },
         uColorA: { value: new THREE.Color("#0a3dff") }, // Deep Blue
-        uColorB: { value: new THREE.Color("#b500ff") }  // Magenta
+        uColorB: { value: new THREE.Color("#ff00aa") }, // Hot Pink
+        uColorC: { value: new THREE.Color("#ffaa00") }, // Warm Gold
     }), []);
 
     useFrame((state, delta) => {

@@ -21,8 +21,9 @@ export function EnemyLasers() {
     const _dir = new THREE.Vector3();
     const _up = new THREE.Vector3(0, 1, 0);
 
-    useFrame((state, delta) => {
+    useFrame((state, rawDelta) => {
         if (!groupRef.current) return;
+        const delta = Math.min(rawDelta, 0.05);
 
         const children = groupRef.current.children;
         const time = state.clock.elapsedTime;

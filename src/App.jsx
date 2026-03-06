@@ -13,6 +13,11 @@ function App() {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Capture mode state
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState(null); // 'listening' | 'playing' | null
+  const captureLoopRef = useRef(null);
+
   // HUD flash states
   const [nearMissFlash, setNearMissFlash] = useState(null);
   const [waveFlash, setWaveFlash] = useState(null);
@@ -61,8 +66,9 @@ function App() {
     return unsubscribe;
   }, []);
 
-  // Auto-play / pause logic
+  // Auto-play / pause logic (file mode)
   useEffect(() => {
+    if (isCapturing) return; // capture mode handles its own loop
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.play();
@@ -77,11 +83,14 @@ function App() {
         audioRef.current.pause();
       }
     }
-  }, [isPlaying]);
+  }, [isPlaying, isCapturing]);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (file) {
+      // Stop capture mode if active
+      if (isCapturing) stopCapture();
+
       setFileName(file.name);
       setIsAnalyzing(true);
       if (isPlaying) setIsPlaying(false);
@@ -104,6 +113,55 @@ function App() {
       setIsPlaying(true);
       gameState.reset();
     }
+  };
+
+  // --- Capture Mode ---
+  const handleCapture = async () => {
+    try {
+      // Set up song detection callbacks
+      engine.onSongStart = () => {
+        setCaptureStatus('playing');
+        gameState.reset();
+        setHasStarted(true);
+      };
+
+      engine.onSongEnd = () => {
+        setCaptureStatus('listening');
+        // Game pauses — player sees their score, can wait for next song
+      };
+
+      await engine.initCapture();
+      setIsCapturing(true);
+      setIsPlaying(false);
+      setCaptureStatus('listening');
+      setFileName('System Audio');
+
+      // Start the capture update loop
+      const loop = () => {
+        if (engine.isCaptureMode && engine.isInitialized) {
+          engine.update();
+          captureLoopRef.current = requestAnimationFrame(loop);
+        }
+      };
+      captureLoopRef.current = requestAnimationFrame(loop);
+
+    } catch (err) {
+      console.error('Capture failed:', err);
+      setCaptureStatus(null);
+      setIsCapturing(false);
+    }
+  };
+
+  const stopCapture = () => {
+    if (captureLoopRef.current) {
+      cancelAnimationFrame(captureLoopRef.current);
+      captureLoopRef.current = null;
+    }
+    engine.stopCapture();
+    engine.onSongStart = null;
+    engine.onSongEnd = null;
+    setIsCapturing(false);
+    setCaptureStatus(null);
   };
 
   const handleRestart = () => {
@@ -180,45 +238,81 @@ function App() {
           </div>
         </header>
 
-        <div className="control-panel glass-panel">
-          <div className="file-upload-section">
-            <label className="cyber-button upload-btn">
-              {isAnalyzing ? '[ ANALYZING TRACK... ]' : '[ LOAD TRACK ]'}
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-                disabled={isAnalyzing}
-              />
-            </label>
-            <span className="file-name">{fileName}</span>
-          </div>
-
-          {!hasStarted && !isAnalyzing && (
-            <p className="subtitle" style={{ textAlign: "center" }}>Please load an audio file to begin.</p>
-          )}
-
-          {hasStarted && !isAnalyzing && (
-            <>
-              <div className="playback-controls">
-                <button className="cyber-button play-btn" onClick={() => setIsPlaying(!isPlaying)}>
-                  {isPlaying ? '|| PAUSE' : '> PLAY'}
+        {/* During active capture gameplay, hide the full panel — just show a small stop button */}
+        {isCapturing && captureStatus === 'playing' ? (
+          <div className="control-panel glass-panel" style={{ padding: '0.8rem' }}>
+            <button className="cyber-button capture-btn active" onClick={stopCapture} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+              [ STOP CAPTURE ]
+            </button>
+            {game.health <= 0 && (
+              <div className="game-status">
+                <div className="game-over-text">SHIP CRITICAL</div>
+                <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
+                <button className="cyber-button primary-btn" onClick={handleRestart}>
+                  [ REPAIR & RESTART ]
                 </button>
               </div>
+            )}
+          </div>
+        ) : (
+          <div className="control-panel glass-panel">
+            <div className="file-upload-section">
+              <label className="cyber-button upload-btn">
+                {isAnalyzing ? '[ ANALYZING TRACK... ]' : '[ LOAD TRACK ]'}
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                  disabled={isAnalyzing}
+                />
+              </label>
 
-              {game.health <= 0 && (
-                <div className="game-status">
-                  <div className="game-over-text">SHIP CRITICAL</div>
-                  <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
-                  <button className="cyber-button primary-btn" onClick={handleRestart}>
-                    [ REPAIR & RESTART ]
+              {!isCapturing ? (
+                <button className="cyber-button capture-btn" onClick={handleCapture}>
+                  [ CAPTURE AUDIO ]
+                </button>
+              ) : (
+                <button className="cyber-button capture-btn active" onClick={stopCapture}>
+                  [ STOP CAPTURE ]
+                </button>
+              )}
+
+              <span className="file-name">{fileName}</span>
+            </div>
+
+            {/* Capture mode: listening for audio */}
+            {isCapturing && captureStatus === 'listening' && (
+              <p className="subtitle capture-listening" style={{ textAlign: "center" }}>
+                Listening for audio... Play a song to begin.
+              </p>
+            )}
+
+            {!hasStarted && !isAnalyzing && !isCapturing && (
+              <p className="subtitle" style={{ textAlign: "center" }}>Please load an audio file or capture system audio to begin.</p>
+            )}
+
+            {hasStarted && !isAnalyzing && !isCapturing && (
+              <>
+                <div className="playback-controls">
+                  <button className="cyber-button play-btn" onClick={() => setIsPlaying(!isPlaying)}>
+                    {isPlaying ? '|| PAUSE' : '> PLAY'}
                   </button>
                 </div>
-              )}
-            </>
-          )}
-        </div>
+
+                {game.health <= 0 && (
+                  <div className="game-status">
+                    <div className="game-over-text">SHIP CRITICAL</div>
+                    <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
+                    <button className="cyber-button primary-btn" onClick={handleRestart}>
+                      [ REPAIR & RESTART ]
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

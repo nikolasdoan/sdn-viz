@@ -28,6 +28,7 @@ export function EnemyShips() {
             strafePhase: Math.random() * Math.PI * 2,
             strafeSpeed: 0.3 + Math.random() * 0.3,
             strafeRadius: 3 + Math.random() * 6,
+            _cachedPos: new THREE.Vector3(), // reusable for position updates
         }));
     }, []);
 
@@ -51,6 +52,9 @@ export function EnemyShips() {
                 data.active = false;
                 gameState.removeEnemy(data.id);
                 gameState.enemyDestroyed(pos);
+                if (pos) {
+                    window.dispatchEvent(new CustomEvent('enemy-explosion', { detail: { position: pos } }));
+                }
             }
         };
         window.addEventListener('enemy-hit', onHit);
@@ -75,9 +79,10 @@ export function EnemyShips() {
         laserCooldowns.current[data.id] = 2.0;
     };
 
-    useFrame((state, delta) => {
+    useFrame((state, rawDelta) => {
         if (!groupRef.current) return;
         if (gameState.health <= 0) return;
+        const delta = Math.min(rawDelta, 0.05);
 
         const time = state.clock.elapsedTime;
         const children = groupRef.current.children;
@@ -103,7 +108,6 @@ export function EnemyShips() {
 
             if (!data.active) {
                 mesh.visible = false;
-                gameState.removeEnemy(data.id);
                 continue;
             }
 
@@ -127,8 +131,9 @@ export function EnemyShips() {
                 continue;
             }
 
-            // Report position (include shield info)
-            gameState.updateEnemyPosition(data.id, mesh.position.clone(), data.health, data.shieldHealth);
+            // Report position (include shield info) — reuse cached vector
+            data._cachedPos.copy(mesh.position);
+            gameState.updateEnemyPosition(data.id, data._cachedPos, data.health, data.shieldHealth);
 
             // === FIRE MISSILES ON BEAT ===
             fireCooldowns.current[i] -= delta;
@@ -344,12 +349,12 @@ export function EnemyShips() {
                             blending={THREE.AdditiveBlending} transparent opacity={0.9}
                         />
                     </mesh>
-                    {/* [9] Shield bubble */}
+                    {/* [9] Shield bubble — gold */}
                     <mesh>
                         <icosahedronGeometry args={[3.5, 1]} />
                         <meshStandardMaterial
-                            color="#00ffff"
-                            emissive="#00aaff"
+                            color="#ffcc00"
+                            emissive="#ff8800"
                             emissiveIntensity={2}
                             transparent
                             opacity={0.3}
@@ -369,12 +374,12 @@ export function EnemyShips() {
                                 emissiveIntensity={1}
                             />
                         </mesh>
-                        {/* Shield HP bar (cyan, on top) */}
+                        {/* Shield HP bar (gold, on top) */}
                         <mesh position={[0, 0.25, 0]}>
                             <boxGeometry args={[3, 0.15, 0.05]} />
                             <meshStandardMaterial
-                                color="#00ffff"
-                                emissive="#00aaff"
+                                color="#ffcc00"
+                                emissive="#ff8800"
                                 emissiveIntensity={2}
                                 transparent
                                 opacity={0.8}

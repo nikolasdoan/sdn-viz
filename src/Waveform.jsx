@@ -3,9 +3,9 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { engine } from './AudioEngine';
 
-const COLOR_BASS = new THREE.Color("#0033ff");
-const COLOR_MID = new THREE.Color("#00ff66");
-const COLOR_HIGH = new THREE.Color("#ffffff");
+const COLOR_BASS = new THREE.Color("#8800ff");  // Purple
+const COLOR_MID = new THREE.Color("#ff0066");   // Hot Pink
+const COLOR_HIGH = new THREE.Color("#ffcc00");  // Gold
 
 export function SingleWaveform({ sideX = -20 }) {
     const materialsRef = useRef([]);

@@ -67,8 +67,9 @@ export function Missiles() {
         return -1;
     };
 
-    useFrame((state, delta) => {
+    useFrame((state, rawDelta) => {
         if (!groupRef.current) return;
+        const delta = Math.min(rawDelta, 0.05);
 
         const time = state.clock.elapsedTime;
         const bass = engine.averageBass || 0;
