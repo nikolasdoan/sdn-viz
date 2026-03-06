@@ -34,7 +34,7 @@ export class AudioEngine {
     // Auto-gain for capture mode (normalizes lower signal levels)
     this.captureGain = 1.0;
     this.capturePeak = 0.0;
-    this.capturePeakDecay = 0.98; // faster decay — adapts quickly to volume changes
+    this.capturePeakDecay = 0.993; // moderate decay — stable but adapts over time
 
     // Song detection for capture mode
     this.songPlaying = false;
@@ -101,29 +101,20 @@ export class AudioEngine {
 
     this.captureStream = stream;
 
-    // Create analyser with less smoothing for capture (snappier response)
+    // Create analyser — low latency for capture
     this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 1024;
-    this.analyser.smoothingTimeConstant = 0.6; // much less smoothing for punchy response
-    this.analyser.minDecibels = -80;
+    this.analyser.fftSize = 512;  // smaller FFT = lower latency
+    this.analyser.smoothingTimeConstant = 0.85; // match file mode
+    this.analyser.minDecibels = -100;
     this.analyser.maxDecibels = -10;
 
-    // Heavy boost on the raw signal before the analyser
+    // Gentle boost — just enough to bring capture up, not flatten dynamics
     this.captureGainNode = this.audioContext.createGain();
-    this.captureGainNode.gain.value = 6.0; // 6x hardware boost
-
-    // Add a compressor to keep peaks under control while boosting quiet parts
-    this.captureCompressor = this.audioContext.createDynamicsCompressor();
-    this.captureCompressor.threshold.value = -24;
-    this.captureCompressor.knee.value = 12;
-    this.captureCompressor.ratio.value = 4;
-    this.captureCompressor.attack.value = 0.003;
-    this.captureCompressor.release.value = 0.1;
+    this.captureGainNode.gain.value = 2.0; // 2x hardware boost (gentle)
 
     this.source = this.audioContext.createMediaStreamSource(stream);
     this.source.connect(this.captureGainNode);
-    this.captureGainNode.connect(this.captureCompressor);
-    this.captureCompressor.connect(this.analyser);
+    this.captureGainNode.connect(this.analyser);
     // Don't connect to destination — avoids feedback loop (audio already plays from the source app)
 
     const bufferLength = this.analyser.frequencyBinCount;
@@ -225,24 +216,9 @@ export class AudioEngine {
     this.analyser.getByteFrequencyData(this.dataArray);
     this.analyser.getByteTimeDomainData(this.timeDataArray);
 
-    // Auto-gain normalization for capture mode
-    // Tracks the running peak and scales signal so capture matches file-upload levels
-    if (this.isCaptureMode) {
-      let rawPeak = 0;
-      for (let i = 0; i < this.dataArray.length; i++) {
-        if (this.dataArray[i] > rawPeak) rawPeak = this.dataArray[i];
-      }
-      // Update running peak with slow decay
-      this.capturePeak = Math.max(rawPeak / 255.0, this.capturePeak * this.capturePeakDecay);
-      // Target: we want the peak to map to ~0.95 (maximize dynamic range)
-      if (this.capturePeak > 0.01) {
-        this.captureGain = Math.min(0.95 / this.capturePeak, 8.0); // cap at 8x — compressor prevents clipping
-      }
-    } else {
-      this.captureGain = 1.0;
-    }
-
-    const gain = this.captureGain;
+    // No auto-gain — the 2x hardware GainNode is enough.
+    // Auto-gain was crushing dynamic range, making quiet parts feel like drops.
+    const gain = 1.0;
 
     let bassSum = 0;
     for (let i = 0; i < 7; i++) bassSum += this.dataArray[i];
@@ -284,12 +260,10 @@ export class AudioEngine {
 
     // --- 2. Update EDM State Machine ---
     if (this.isCaptureMode) {
-      // In capture mode, use real-time energy + bass for state detection
-      // Combine overall energy with bass for more aggressive state changes
-      const energy = Math.max(this.averageOverall, this.averageBass * 0.8);
-      if (energy > 0.28) {
+      // In capture mode, use real-time energy for state — thresholds match file mode feel
+      if (this.averageOverall > 0.31) {
         this.currentState = 'drop';
-      } else if (energy > 0.10) {
+      } else if (this.averageOverall > 0.18) {
         this.currentState = 'buildup';
       } else {
         this.currentState = 'chill';
