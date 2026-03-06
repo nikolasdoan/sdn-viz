@@ -228,10 +228,14 @@ function App() {
                 <div className="wave-display">WAVE {game.wave} | KILLS {game.kills} | WPN LV{game.weaponLevel}</div>
                 <div className="health-container">
                   {Array.from({ length: game.maxHealth }).map((_, i) => (
-                    <span key={i} className={`heart ${i >= game.health ? 'empty' : ''}`}>
-                      {i >= game.health ? '\u2661' : '\u2665'}
+                    <span key={i} className={`health-prism ${i >= game.health ? 'empty' : ''}`}>
+                      ◆
                     </span>
                   ))}
+                </div>
+                <div className="item-legend">
+                  <span className="legend-item"><span className="legend-icon repair">◆</span> REPAIR</span>
+                  <span className="legend-item"><span className="legend-icon powerup">◎</span> POWER UP</span>
                 </div>
               </div>
             )}
@@ -269,9 +273,12 @@ function App() {
               </label>
 
               {!isCapturing ? (
-                <button className="cyber-button capture-btn" onClick={handleCapture}>
-                  [ CAPTURE AUDIO ]
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
+                  <button className="cyber-button capture-btn" onClick={handleCapture}>
+                    [ CAPTURE AUDIO ]
+                  </button>
+                  <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '1px' }}>CHROMIUM BROWSERS ONLY</span>
+                </div>
               ) : (
                 <button className="cyber-button capture-btn active" onClick={stopCapture}>
                   [ STOP CAPTURE ]

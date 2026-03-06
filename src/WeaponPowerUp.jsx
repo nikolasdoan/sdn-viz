@@ -126,9 +126,9 @@ export function WeaponPowerUps() {
                 light.intensity = 4 + Math.sin(time * 8) * 2;
             }
 
-            // Pickup collision
+            // Pickup collision — generous radius
             const dist = mesh.position.distanceTo(shipPos);
-            if (dist < 3.0) {
+            if (dist < 6.0) {
                 data.active = false;
                 mesh.visible = false;
                 gameState.weaponPowerUp();
@@ -149,7 +149,7 @@ export function WeaponPowerUps() {
                 <group key={i} visible={false}>
                     {/* Outer ring */}
                     <mesh>
-                        <torusGeometry args={[1.2, 0.18, 8, 16]} />
+                        <torusGeometry args={[2.0, 0.3, 8, 16]} />
                         <meshStandardMaterial
                             color="#ff0000"
                             emissive="#ff0000"
@@ -161,7 +161,7 @@ export function WeaponPowerUps() {
                     </mesh>
                     {/* Inner core — octahedron */}
                     <mesh>
-                        <octahedronGeometry args={[0.6, 0]} />
+                        <octahedronGeometry args={[1.0, 0]} />
                         <meshStandardMaterial
                             color="#ffffff"
                             emissive="#ffffff"
@@ -169,8 +169,8 @@ export function WeaponPowerUps() {
                         />
                     </mesh>
                     {/* Arrow indicator */}
-                    <mesh position={[0, 1.6, 0]}>
-                        <coneGeometry args={[0.35, 0.7, 4]} />
+                    <mesh position={[0, 2.6, 0]}>
+                        <coneGeometry args={[0.5, 1.0, 4]} />
                         <meshStandardMaterial
                             color="#ffffff"
                             emissive="#ffffff"
@@ -180,7 +180,7 @@ export function WeaponPowerUps() {
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    <pointLight color="#ffffff" distance={15} intensity={4} />
+                    <pointLight color="#ffffff" distance={25} intensity={6} />
                 </group>
             ))}
         </group>

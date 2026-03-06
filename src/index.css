@@ -190,24 +190,67 @@ input[type=range]::-webkit-slider-runnable-track {
   background: var(--glass-border);
   border-radius: 2px;
 }
-/* Health Indicator (Hearts) */
+/* Health Indicator (Prism diamonds) */
 .health-container {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
 }
 
-.heart {
-  font-size: 1.5rem;
-  color: var(--secondary-color);
-  filter: drop-shadow(0 0 5px var(--secondary-color));
+.health-prism {
+  font-size: 1.4rem;
+  color: #00ff66;
+  filter: drop-shadow(0 0 6px #00ff66) drop-shadow(0 0 12px #00ff4488);
   transition: all 0.3s ease;
 }
 
-.heart.empty {
+.health-prism.empty {
   color: #333;
   filter: none;
-  opacity: 0.5;
+  opacity: 0.4;
+}
+
+/* Item Legend */
+.item-legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  justify-content: flex-end;
+}
+
+.legend-item {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #aaa;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend-icon {
+  font-size: 1.5rem;
+}
+
+.legend-icon.repair {
+  color: #00ff66;
+  filter: drop-shadow(0 0 4px #00ff66);
+}
+
+.legend-icon.powerup {
+  color: #ff00ff;
+  filter: drop-shadow(0 0 4px #ff00ff);
+  animation: rainbow-cycle 3s linear infinite;
+}
+
+@keyframes rainbow-cycle {
+  0% { color: #ff0000; filter: drop-shadow(0 0 4px #ff0000); }
+  16% { color: #ff8800; filter: drop-shadow(0 0 4px #ff8800); }
+  33% { color: #ffff00; filter: drop-shadow(0 0 4px #ffff00); }
+  50% { color: #00ff44; filter: drop-shadow(0 0 4px #00ff44); }
+  66% { color: #00aaff; filter: drop-shadow(0 0 4px #00aaff); }
+  83% { color: #8800ff; filter: drop-shadow(0 0 4px #8800ff); }
+  100% { color: #ff0000; filter: drop-shadow(0 0 4px #ff0000); }
 }
 
 .game-status {

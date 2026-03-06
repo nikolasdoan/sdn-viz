@@ -34,7 +34,7 @@ export class AudioEngine {
     // Auto-gain for capture mode (normalizes lower signal levels)
     this.captureGain = 1.0;
     this.capturePeak = 0.0;
-    this.capturePeakDecay = 0.995; // slow decay so gain stays stable
+    this.capturePeakDecay = 0.98; // faster decay — adapts quickly to volume changes
 
     // Song detection for capture mode
     this.songPlaying = false;
@@ -101,13 +101,29 @@ export class AudioEngine {
 
     this.captureStream = stream;
 
-    // Create analyser
+    // Create analyser with less smoothing for capture (snappier response)
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 1024;
-    this.analyser.smoothingTimeConstant = 0.85;
+    this.analyser.smoothingTimeConstant = 0.6; // much less smoothing for punchy response
+    this.analyser.minDecibels = -80;
+    this.analyser.maxDecibels = -10;
+
+    // Heavy boost on the raw signal before the analyser
+    this.captureGainNode = this.audioContext.createGain();
+    this.captureGainNode.gain.value = 6.0; // 6x hardware boost
+
+    // Add a compressor to keep peaks under control while boosting quiet parts
+    this.captureCompressor = this.audioContext.createDynamicsCompressor();
+    this.captureCompressor.threshold.value = -24;
+    this.captureCompressor.knee.value = 12;
+    this.captureCompressor.ratio.value = 4;
+    this.captureCompressor.attack.value = 0.003;
+    this.captureCompressor.release.value = 0.1;
 
     this.source = this.audioContext.createMediaStreamSource(stream);
-    this.source.connect(this.analyser);
+    this.source.connect(this.captureGainNode);
+    this.captureGainNode.connect(this.captureCompressor);
+    this.captureCompressor.connect(this.analyser);
     // Don't connect to destination — avoids feedback loop (audio already plays from the source app)
 
     const bufferLength = this.analyser.frequencyBinCount;
@@ -218,9 +234,9 @@ export class AudioEngine {
       }
       // Update running peak with slow decay
       this.capturePeak = Math.max(rawPeak / 255.0, this.capturePeak * this.capturePeakDecay);
-      // Target: we want the peak to map to ~0.85 (leaving headroom)
+      // Target: we want the peak to map to ~0.95 (maximize dynamic range)
       if (this.capturePeak > 0.01) {
-        this.captureGain = Math.min(0.85 / this.capturePeak, 4.0); // cap at 4x to avoid noise amplification
+        this.captureGain = Math.min(0.95 / this.capturePeak, 8.0); // cap at 8x — compressor prevents clipping
       }
     } else {
       this.captureGain = 1.0;
@@ -245,12 +261,16 @@ export class AudioEngine {
     this.averageOverall = Math.min(totalSum / this.dataArray.length / 255.0 * gain, 1.0);
 
     // --- Beat Detection (transient spike on bass) ---
+    // Lower thresholds for capture mode since signal can still be weaker
+    const beatThresh = this.isCaptureMode ? 0.08 : this.beatThreshold;
+    const bassFloor = this.isCaptureMode ? 0.12 : 0.25;
+
     this.isBeat = false;
     if (this.beatCooldown > 0) {
       this.beatCooldown -= 1 / 60; // approximate frame time
     } else {
       const bassSpike = this.averageBass - this.prevBass;
-      if (bassSpike > this.beatThreshold && this.averageBass > 0.25) {
+      if (bassSpike > beatThresh && this.averageBass > bassFloor) {
         this.isBeat = true;
         this.beatCooldown = this.beatCooldownTime;
       }
@@ -264,10 +284,12 @@ export class AudioEngine {
 
     // --- 2. Update EDM State Machine ---
     if (this.isCaptureMode) {
-      // In capture mode, use real-time energy for state since we have no pre-analyzed map
-      if (this.averageOverall > 0.35) {
+      // In capture mode, use real-time energy + bass for state detection
+      // Combine overall energy with bass for more aggressive state changes
+      const energy = Math.max(this.averageOverall, this.averageBass * 0.8);
+      if (energy > 0.28) {
         this.currentState = 'drop';
-      } else if (this.averageOverall > 0.15) {
+      } else if (energy > 0.10) {
         this.currentState = 'buildup';
       } else {
         this.currentState = 'chill';

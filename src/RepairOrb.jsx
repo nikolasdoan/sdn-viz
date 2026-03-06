@@ -83,9 +83,9 @@ export function RepairOrbs() {
                 cross.material.emissiveIntensity = 4 + Math.sin(time * 5) * 2;
             }
 
-            // Collision with ship
+            // Collision with ship — generous radius
             const dist = mesh.position.distanceTo(shipPos);
-            if (dist < 3.0) {
+            if (dist < 6.0) {
                 const repaired = gameState.repair();
                 if (repaired) {
                     data.active = false;
@@ -108,7 +108,7 @@ export function RepairOrbs() {
                 <group key={i} visible={false}>
                     {/* Outer prism wireframe — green crystal */}
                     <mesh>
-                        <octahedronGeometry args={[1.5, 0]} />
+                        <octahedronGeometry args={[2.5, 0]} />
                         <meshStandardMaterial
                             color="#00ff66"
                             emissive="#00ff44"
@@ -121,7 +121,7 @@ export function RepairOrbs() {
                     </mesh>
                     {/* Inner solid prism — smaller, brighter */}
                     <mesh>
-                        <octahedronGeometry args={[0.8, 0]} />
+                        <octahedronGeometry args={[1.3, 0]} />
                         <meshStandardMaterial
                             color="#00ff88"
                             emissive="#00ff66"
@@ -132,7 +132,7 @@ export function RepairOrbs() {
                     </mesh>
                     {/* Cross / plus sign — health symbol */}
                     <mesh>
-                        <boxGeometry args={[0.2, 1.2, 0.2]} />
+                        <boxGeometry args={[0.3, 2.0, 0.3]} />
                         <meshStandardMaterial
                             color="#ffffff"
                             emissive="#00ff88"
@@ -143,7 +143,7 @@ export function RepairOrbs() {
                         />
                     </mesh>
                     <mesh>
-                        <boxGeometry args={[1.2, 0.2, 0.2]} />
+                        <boxGeometry args={[2.0, 0.3, 0.3]} />
                         <meshStandardMaterial
                             color="#ffffff"
                             emissive="#00ff88"
@@ -153,7 +153,7 @@ export function RepairOrbs() {
                             opacity={0.9}
                         />
                     </mesh>
-                    <pointLight color="#00ff66" distance={12} intensity={3} />
+                    <pointLight color="#00ff66" distance={25} intensity={5} />
                 </group>
             ))}
         </group>
