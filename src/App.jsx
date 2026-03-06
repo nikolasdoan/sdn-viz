@@ -287,7 +287,7 @@ function App() {
           <div className="control-panel glass-panel">
             <div className="file-upload-section">
               <label className="cyber-button upload-btn">
-                {isAnalyzing ? '[ ANALYZING TRACK... ]' : '[ LOAD TRACK ]'}
+                {isAnalyzing ? '[ ANALYZING TRACK... ]' : 'LOCAL TRACK [BEST]'}
                 <input
                   type="file"
                   accept="audio/*"
@@ -300,9 +300,9 @@ function App() {
               {!isCapturing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
                   <button className="cyber-button capture-btn" onClick={handleCapture}>
-                    [ CAPTURE AUDIO ]
+                    CAPTURE AUDIO [Chrome Only]
                   </button>
-                  <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '1px' }}>CHROMIUM BROWSERS ONLY</span>
+                  <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '1px' }}></span>
                 </div>
               ) : (
                 <button className="cyber-button capture-btn active" onClick={stopCapture}>
