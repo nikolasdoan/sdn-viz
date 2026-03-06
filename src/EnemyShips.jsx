@@ -41,6 +41,13 @@ export function EnemyShips() {
             if (data.shieldHealth > 0) {
                 data.shieldHealth -= 1;
                 flashTimers.current[enemyId] = 0.12;
+                // Shield bleed particles
+                const mesh = groupRef.current?.children[enemyId];
+                if (mesh) {
+                    window.dispatchEvent(new CustomEvent('shield-hit', {
+                        detail: { position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z } }
+                    }));
+                }
             } else {
                 data.health -= 1;
                 flashTimers.current[enemyId] = 0.15;
