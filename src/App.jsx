@@ -243,6 +243,18 @@ function App() {
     gameState.reset();
   };
 
+  const handleHome = () => {
+    if (isCapturing) stopCapture();
+    if (isPlaying) setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    setHasStarted(false);
+    setFileName('No file selected');
+    gameState.reset();
+  };
+
   return (
     <div className="app-container">
       <audio ref={audioRef} crossOrigin="anonymous" loop />
@@ -296,7 +308,7 @@ function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h1 className="title">SOUND_VOYAGE.JS</h1>
-              <p className="subtitle"><a href="https://www.tecxmate.com" target="_blank" rel="noopener noreferrer" className="tecxmate-link">By TECXMATE.COM</a></p>
+              <p className="subtitle"><a href="https://www.tecxmate.com" target="_blank" rel="noopener noreferrer" className="tecxmate-link"></a></p>
             </div>
 
             {/* Score + Combo + Health */}
@@ -326,15 +338,20 @@ function App() {
         {/* Mobile: hide panel during active gameplay */}
         {isMobile && hasStarted && isPlaying && game.health > 0 ? null : (
           <>
-            {/* Capture mode playing — minimal controls */}
-            {isCapturing && captureStatus === 'playing' ? (
+            {/* Active gameplay — minimal controls (capture or local file) */}
+            {hasStarted && !isMobile && (isCapturing ? captureStatus === 'playing' : !isAnalyzing) ? (
               <div className="control-panel glass-panel" style={{ padding: '0.8rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button className="cyber-button capture-btn active" onClick={stopCapture} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
-                    [ STOP CAPTURE ]
+                  {isCapturing && (
+                    <button className="cyber-button capture-btn active" onClick={stopCapture} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                      [ STOP CAPTURE ]
+                    </button>
+                  )}
+                  <button className="cyber-button play-btn" onClick={isCapturing ? toggleCapturePause : () => setIsPlaying(!isPlaying)} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                    {(isCapturing ? capturePaused : !isPlaying) ? '> PLAY' : '|| PAUSE'}
                   </button>
-                  <button className="cyber-button play-btn" onClick={toggleCapturePause} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
-                    {capturePaused ? '> PLAY' : '|| PAUSE'}
+                  <button className="cyber-button home-btn" onClick={handleHome} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                    [ HOME ]
                   </button>
                 </div>
                 {game.health <= 0 && (
