@@ -3,35 +3,41 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { engine } from './AudioEngine';
 
-// Color Palette: Vibrant Neon Space
-const COLOR_BASS = new THREE.Color("#6600ff");   // Electric Purple
-const COLOR_MID = new THREE.Color("#ff0088");    // Hot Pink
-const COLOR_HIGH = new THREE.Color("#ffaa00");   // Golden Orange
-const COLOR_DROP = new THREE.Color("#00ffcc");   // Teal Cyan
+// Rich color palette — each beam picks its own color
+const BEAM_COLORS = [
+    new THREE.Color("#6600ff"), // Electric Purple
+    new THREE.Color("#aa00ff"), // Violet
+    new THREE.Color("#ff0088"), // Hot Pink
+    new THREE.Color("#ff0044"), // Crimson
+    new THREE.Color("#ff4400"), // Orange Red
+    new THREE.Color("#ff8800"), // Orange
+    new THREE.Color("#ffaa00"), // Golden
+    new THREE.Color("#ffee00"), // Yellow
+    new THREE.Color("#00ffcc"), // Teal Cyan
+    new THREE.Color("#00ff88"), // Mint
+    new THREE.Color("#00aaff"), // Sky Blue
+    new THREE.Color("#0066ff"), // Blue
+];
 
 function HyperspeedBeams({ count = 60, baseLength = 80 }) {
     const groupRef = useRef();
-
-    // We store cumulative time ourselves so we can dynamically change speed 
-    // without jumping positions wildly when speed multiplies
     const cumulativeTime = useRef(0);
+    const beatPulse = useRef(0);
 
-    // Create an array of laser beam meshes
     const lasersData = useMemo(() => {
         return Array.from({ length: count }, (_, i) => {
-            // Distribute beams far outside the playing field (player moves ±80x, ±50y)
-            // Place beams in outer ring only: 120-250 range from center
             const angle = Math.random() * Math.PI * 2;
             const radius = 120 + Math.random() * 130;
-            let x = Math.cos(angle) * radius;
-            let y = Math.sin(angle) * radius;
-
-            const z = (Math.random() - 0.5) * 500; // -250 to 250 initial distribution
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+            const z = (Math.random() - 0.5) * 500;
 
             return {
                 initialZ: z,
-                position: [x, y, 0], // Z will be calculated in the frame loop
-                randomSeed: Math.random() // For strobing variation
+                position: [x, y, 0],
+                randomSeed: Math.random(),
+                // Each beam gets its own color from the palette
+                color: BEAM_COLORS[Math.floor(Math.random() * BEAM_COLORS.length)].clone(),
             };
         });
     }, [count]);
@@ -39,95 +45,77 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
     useFrame((state, delta) => {
         if (!groupRef.current) return;
 
-        // Grab current audio data
         const bass = engine.averageBass;
         const mid = engine.averageMid;
         const high = engine.averageHighs;
-
-        // Grab pre-analyzed EDM State
         const edmState = engine.currentState;
 
-        // Define base behavior multipliers based on the State Machine
+        // Beat pulse with smooth decay
+        if (engine.isBeat) beatPulse.current = 1.0;
+        beatPulse.current *= 0.87;
+        const bp = beatPulse.current;
+
         let flightSpeed = 100.0;
         let intensityMultiplier = 1.0;
         let scaleMultiplier = 1.0;
 
         if (edmState === 'chill') {
-            flightSpeed = 20.0; // Slow, lazy passing lights like distant traffic
-            intensityMultiplier = 0.5; // Dimmer
-            scaleMultiplier = 0.5; // Thinner
+            flightSpeed = 20.0;
+            intensityMultiplier = 0.3;
+            scaleMultiplier = 0.5;
         } else if (edmState === 'buildup') {
-            flightSpeed = 150.0; // Fast panic warp
-            intensityMultiplier = 1.0; // Normal brightness
+            flightSpeed = 150.0;
+            intensityMultiplier = 0.6;
             scaleMultiplier = 1.0;
         } else if (edmState === 'drop') {
-            flightSpeed = 400.0; // Hyper-drive maximum speed
-            intensityMultiplier = 1.5; // Reduced from 4.0 to prevent blowout
-            scaleMultiplier = 2.0; // Reduced from 3.0
+            flightSpeed = 400.0;
+            intensityMultiplier = 0.8;
+            scaleMultiplier = 1.5;
         }
 
-        // Apply Time-based forward movement (+Z)
         cumulativeTime.current += delta * flightSpeed;
 
-        // Determine the "base" color to use based on the loudest frequency + EDM state
-        let dominantColor = COLOR_BASS;
-        let dominantIntensity = bass;
-        let dominantScale = bass;
-
-        if (edmState === 'drop') {
-            // During drops, cycle between teal and gold for maximum spectacle
-            const cycle = Math.sin(cumulativeTime.current * 0.05) * 0.5 + 0.5;
-            dominantColor = COLOR_DROP.clone().lerp(COLOR_HIGH, cycle);
-            dominantIntensity = Math.max(bass, mid, high);
-            dominantScale = dominantIntensity;
-        } else if (mid > bass && mid > high) {
-            dominantColor = COLOR_MID;
-            dominantIntensity = mid;
-            dominantScale = mid;
-        } else if (high > bass && high > mid) {
-            dominantColor = COLOR_HIGH;
-            dominantIntensity = high;
-            dominantScale = high;
-        }
+        const dominantIntensity = Math.max(bass, mid, high);
+        const dominantScale = dominantIntensity;
 
         const children = groupRef.current.children;
 
-        // Apply movement and color to individual passing beams
         for (let i = 0; i < children.length; i++) {
             const mesh = children[i];
             const data = lasersData[i];
             const mat = mesh.material;
 
-            // Calculate absolute Z position moving forward
             let currentZ = data.initialZ + cumulativeTime.current;
-
-            // Wrap around at the camera (Z = 50) back to the deep background (Z = -450)
             currentZ = ((currentZ + 450) % 500) - 450;
-
             mesh.position.z = currentZ;
 
-            // Add a slight barrel roll twirl to the beams as they fly past
             mesh.rotation.y += delta * 2.0;
 
-            // Strobe effect: Only light up certain beams based on time and index, or almost all in Drop
-            const strobeOn = (Math.sin(cumulativeTime.current * 0.1 + i + data.randomSeed * 10) > 0) || (edmState === 'drop' && Math.random() > 0.1);
+            // Strobe — during drops, only ~40% of beams lit (down from 90%)
+            const strobeWave = Math.sin(cumulativeTime.current * 0.1 + i + data.randomSeed * 10);
+            const strobeOn = (strobeWave > 0) || (edmState === 'drop' && strobeWave > -0.6);
 
             if (strobeOn) {
-                mat.emissive.copy(dominantColor);
-                mat.emissiveIntensity = (0.5 + (dominantIntensity * 6.0)) * intensityMultiplier;
+                // Use this beam's own color, shifted slightly by time for shimmer
+                const timeShift = Math.sin(cumulativeTime.current * 0.03 + i * 0.5) * 0.15;
+                mat.emissive.copy(data.color);
+                mat.emissive.r = Math.min(1, mat.emissive.r + timeShift);
+                mat.emissive.g = Math.min(1, mat.emissive.g + timeShift * 0.5);
 
-                // Because we rotated the mesh X-axis 90 degrees, its local Y is now the world Z.
-                // So scaling Y stretches the length, scaling X/Z thickens the radius.
-                mesh.scale.x = 1 + (dominantScale * 1.5 * scaleMultiplier); // Beam thickness
-                mesh.scale.z = 1 + (dominantScale * 1.5 * scaleMultiplier); // Beam thickness
+                // Intensity reacts to beat pulse + audio
+                mat.emissiveIntensity = (0.3 + dominantIntensity * 3.0 + bp * 2.5) * intensityMultiplier;
 
-                // Stretch length immensely during high speed drops for light-trail effect
-                mesh.scale.y = 1 + (flightSpeed / 100.0);
+                mesh.scale.x = 1 + (dominantScale * 1.5 + bp * 0.8) * scaleMultiplier;
+                mesh.scale.z = 1 + (dominantScale * 1.5 + bp * 0.8) * scaleMultiplier;
+                mesh.scale.y = 1 + (flightSpeed / 100.0) + bp * 0.5;
+
+                mat.opacity = 0.5 + dominantIntensity * 0.3 + bp * 0.15;
             } else {
-                mat.emissiveIntensity = 0.05; // Ghostly dim off state
+                mat.emissiveIntensity = 0.03;
                 mesh.scale.x = 0.5;
                 mesh.scale.z = 0.5;
                 mesh.scale.y = 1.0;
+                mat.opacity = 0.2;
             }
         }
     });
@@ -152,11 +140,9 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
     );
 }
 
-// Epic Lasers now exports the Hyperspeed Beams that zip past the camera
 export function Lasers() {
     return (
         <group>
-            {/* The infinite tunnel of passing light trails */}
             <HyperspeedBeams count={80} baseLength={350} />
         </group>
     );

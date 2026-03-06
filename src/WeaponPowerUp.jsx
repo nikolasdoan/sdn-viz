@@ -5,6 +5,29 @@ import { gameState } from './GameState';
 
 const MAX_POWERUPS = 6;
 
+// Rainbow color cycle
+const RAINBOW = [
+    new THREE.Color('#ff0000'),
+    new THREE.Color('#ff8800'),
+    new THREE.Color('#ffff00'),
+    new THREE.Color('#00ff44'),
+    new THREE.Color('#00aaff'),
+    new THREE.Color('#8800ff'),
+    new THREE.Color('#ff00ff'),
+];
+
+const _color = new THREE.Color();
+
+function getRainbow(t) {
+    const idx = ((t % 1) + 1) % 1 * RAINBOW.length;
+    const i = Math.floor(idx);
+    const f = idx - i;
+    const a = RAINBOW[i % RAINBOW.length];
+    const b = RAINBOW[(i + 1) % RAINBOW.length];
+    _color.copy(a).lerp(b, f);
+    return _color;
+}
+
 export function WeaponPowerUps() {
     const groupRef = useRef();
 
@@ -57,13 +80,51 @@ export function WeaponPowerUps() {
             data.life += delta;
             mesh.position.addScaledVector(data.velocity, delta);
 
-            // Spin and bob
-            mesh.rotation.y = time * 3 + data.spinPhase;
-            mesh.rotation.z = Math.sin(time * 2 + data.spinPhase) * 0.3;
+            // Fast spin
+            mesh.rotation.y = time * 4 + data.spinPhase;
+            mesh.rotation.x = time * 2.5 + data.spinPhase;
+            mesh.rotation.z = Math.sin(time * 3 + data.spinPhase) * 0.5;
 
-            // Pulse scale
-            const pulse = 1 + Math.sin(time * 6 + data.spinPhase) * 0.15;
+            // Pulsing scale — big throb
+            const pulse = 1.2 + Math.sin(time * 8 + data.spinPhase) * 0.3;
             mesh.scale.setScalar(pulse);
+
+            // Rainbow cycle — each powerup offset by its phase
+            const rainbowT = time * 0.5 + i * 0.15;
+            const col = getRainbow(rainbowT);
+
+            // Outer ring
+            const ring = mesh.children[0];
+            if (ring && ring.material) {
+                ring.material.color.copy(col);
+                ring.material.emissive.copy(col);
+                ring.material.emissiveIntensity = 4 + Math.sin(time * 10 + data.spinPhase) * 2;
+            }
+
+            // Inner core — offset rainbow
+            const core = mesh.children[1];
+            if (core && core.material) {
+                const col2 = getRainbow(rainbowT + 0.3);
+                core.material.color.copy(col2);
+                core.material.emissive.copy(col2);
+                core.material.emissiveIntensity = 6 + Math.sin(time * 12 + data.spinPhase) * 3;
+            }
+
+            // Arrow
+            const arrow = mesh.children[2];
+            if (arrow && arrow.material) {
+                const col3 = getRainbow(rainbowT + 0.6);
+                arrow.material.color.copy(col3);
+                arrow.material.emissive.copy(col3);
+                arrow.material.emissiveIntensity = 5;
+            }
+
+            // Point light color
+            const light = mesh.children[3];
+            if (light) {
+                light.color.copy(col);
+                light.intensity = 4 + Math.sin(time * 8) * 2;
+            }
 
             // Pickup collision
             const dist = mesh.position.distanceTo(shipPos);
@@ -79,12 +140,6 @@ export function WeaponPowerUps() {
                 data.active = false;
                 mesh.visible = false;
             }
-
-            // Update inner glow
-            const inner = mesh.children[1];
-            if (inner && inner.material) {
-                inner.material.emissiveIntensity = 4 + Math.sin(time * 10 + data.spinPhase) * 2;
-            }
         }
     });
 
@@ -92,40 +147,40 @@ export function WeaponPowerUps() {
         <group ref={groupRef}>
             {Array.from({ length: MAX_POWERUPS }, (_, i) => (
                 <group key={i} visible={false}>
-                    {/* Outer ring — cyan */}
+                    {/* Outer ring */}
                     <mesh>
-                        <torusGeometry args={[1.0, 0.15, 8, 16]} />
+                        <torusGeometry args={[1.2, 0.18, 8, 16]} />
                         <meshStandardMaterial
-                            color="#00ffff"
-                            emissive="#00ffff"
-                            emissiveIntensity={3}
-                            transparent
-                            opacity={0.8}
-                            blending={THREE.AdditiveBlending}
-                        />
-                    </mesh>
-                    {/* Inner core — bright green */}
-                    <mesh>
-                        <octahedronGeometry args={[0.5, 0]} />
-                        <meshStandardMaterial
-                            color="#00ff88"
-                            emissive="#00ff44"
-                            emissiveIntensity={5}
-                        />
-                    </mesh>
-                    {/* Arrow indicator — up chevron */}
-                    <mesh position={[0, 1.4, 0]}>
-                        <coneGeometry args={[0.3, 0.6, 4]} />
-                        <meshStandardMaterial
-                            color="#00ffaa"
-                            emissive="#00ff66"
+                            color="#ff0000"
+                            emissive="#ff0000"
                             emissiveIntensity={4}
                             transparent
                             opacity={0.9}
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    <pointLight color="#00ff88" distance={10} intensity={2} />
+                    {/* Inner core — octahedron */}
+                    <mesh>
+                        <octahedronGeometry args={[0.6, 0]} />
+                        <meshStandardMaterial
+                            color="#ffffff"
+                            emissive="#ffffff"
+                            emissiveIntensity={6}
+                        />
+                    </mesh>
+                    {/* Arrow indicator */}
+                    <mesh position={[0, 1.6, 0]}>
+                        <coneGeometry args={[0.35, 0.7, 4]} />
+                        <meshStandardMaterial
+                            color="#ffffff"
+                            emissive="#ffffff"
+                            emissiveIntensity={5}
+                            transparent
+                            opacity={0.9}
+                            blending={THREE.AdditiveBlending}
+                        />
+                    </mesh>
+                    <pointLight color="#ffffff" distance={15} intensity={4} />
                 </group>
             ))}
         </group>

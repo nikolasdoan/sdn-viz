@@ -1,14 +1,14 @@
-import React, { useRef, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { gameState } from './GameState';
 
 const MAX_ORBS = 3;
-const SPAWN_INTERVAL = 25; // seconds between spawns
+const SPAWN_INTERVAL = 25;
 
 export function RepairOrbs() {
     const groupRef = useRef();
-    const spawnTimer = useRef(15); // first orb spawns after 15s
+    const spawnTimer = useRef(15);
 
     const orbData = useMemo(() => {
         return Array.from({ length: MAX_ORBS }, () => ({
@@ -36,7 +36,6 @@ export function RepairOrbs() {
         spawnTimer.current += delta;
         if (spawnTimer.current >= SPAWN_INTERVAL) {
             spawnTimer.current = 0;
-            // Find an inactive orb to spawn
             for (let i = 0; i < MAX_ORBS; i++) {
                 if (!orbData[i].active) {
                     spawnOrb(children[i], orbData[i]);
@@ -57,17 +56,32 @@ export function RepairOrbs() {
             }
 
             mesh.visible = true;
-
-            // Fly straight toward camera (positive Z)
             mesh.position.z += data.speed * delta;
 
-            // Rotate for visual flair
-            mesh.rotation.x += delta * 2;
-            mesh.rotation.y += delta * 3;
+            // Slow elegant tumble
+            mesh.rotation.x += delta * 1.2;
+            mesh.rotation.y += delta * 1.8;
+            mesh.rotation.z += delta * 0.8;
 
             // Pulsing scale
-            const pulse = 1.0 + Math.sin(time * 5) * 0.2;
+            const pulse = 1.0 + Math.sin(time * 4) * 0.15;
             mesh.scale.setScalar(pulse);
+
+            // Update materials — prism wireframe pulses green
+            const prism = mesh.children[0];
+            if (prism && prism.material) {
+                prism.material.emissiveIntensity = 3 + Math.sin(time * 6) * 1.5;
+            }
+            // Inner solid prism glows
+            const inner = mesh.children[1];
+            if (inner && inner.material) {
+                inner.material.emissiveIntensity = 2 + Math.sin(time * 8 + 1) * 1;
+            }
+            // Cross piece
+            const cross = mesh.children[2];
+            if (cross && cross.material) {
+                cross.material.emissiveIntensity = 4 + Math.sin(time * 5) * 2;
+            }
 
             // Collision with ship
             const dist = mesh.position.distanceTo(shipPos);
@@ -91,18 +105,56 @@ export function RepairOrbs() {
     return (
         <group ref={groupRef}>
             {Array.from({ length: MAX_ORBS }, (_, i) => (
-                <mesh key={i} visible={false}>
-                    <icosahedronGeometry args={[1.2, 1]} />
-                    <meshStandardMaterial
-                        color="#00ff66"
-                        emissive="#00ff44"
-                        emissiveIntensity={4}
-                        transparent
-                        opacity={0.85}
-                        blending={THREE.AdditiveBlending}
-                        wireframe
-                    />
-                </mesh>
+                <group key={i} visible={false}>
+                    {/* Outer prism wireframe — green crystal */}
+                    <mesh>
+                        <octahedronGeometry args={[1.5, 0]} />
+                        <meshStandardMaterial
+                            color="#00ff66"
+                            emissive="#00ff44"
+                            emissiveIntensity={3}
+                            transparent
+                            opacity={0.7}
+                            blending={THREE.AdditiveBlending}
+                            wireframe
+                        />
+                    </mesh>
+                    {/* Inner solid prism — smaller, brighter */}
+                    <mesh>
+                        <octahedronGeometry args={[0.8, 0]} />
+                        <meshStandardMaterial
+                            color="#00ff88"
+                            emissive="#00ff66"
+                            emissiveIntensity={2}
+                            transparent
+                            opacity={0.5}
+                        />
+                    </mesh>
+                    {/* Cross / plus sign — health symbol */}
+                    <mesh>
+                        <boxGeometry args={[0.2, 1.2, 0.2]} />
+                        <meshStandardMaterial
+                            color="#ffffff"
+                            emissive="#00ff88"
+                            emissiveIntensity={5}
+                            blending={THREE.AdditiveBlending}
+                            transparent
+                            opacity={0.9}
+                        />
+                    </mesh>
+                    <mesh>
+                        <boxGeometry args={[1.2, 0.2, 0.2]} />
+                        <meshStandardMaterial
+                            color="#ffffff"
+                            emissive="#00ff88"
+                            emissiveIntensity={5}
+                            blending={THREE.AdditiveBlending}
+                            transparent
+                            opacity={0.9}
+                        />
+                    </mesh>
+                    <pointLight color="#00ff66" distance={12} intensity={3} />
+                </group>
             ))}
         </group>
     );

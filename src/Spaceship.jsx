@@ -4,11 +4,10 @@ import { Trail } from '@react-three/drei';
 import * as THREE from 'three';
 import { engine } from './AudioEngine';
 import { gameState } from './GameState';
+import { ExhaustFlames } from './ExhaustFlames';
 
 export function Spaceship() {
     const shipRef = useRef();
-    const leftThrusterRef = useRef();
-    const rightThrusterRef = useRef();
     const explosionFlashRef = useRef();
     const { camera } = useThree();
 
@@ -17,6 +16,8 @@ export function Spaceship() {
 
     // Cached vectors to avoid GC pressure from per-frame allocations
     const _camTarget = useRef(new THREE.Vector3());
+    const _lookTarget = useRef(new THREE.Vector3());
+    const _smoothLook = useRef(new THREE.Vector3(0, -3, 0));
 
     // Input state — added Space for shooting
     const keys = useRef({
@@ -159,7 +160,7 @@ export function Spaceship() {
 
         // 3. Physics
         const acceleration = 70;
-        const friction = 0.94;
+        const friction = Math.pow(0.94, delta * 60); // frame-rate independent
         const maxSpeed = 45;
 
         if (keys.current.ArrowLeft) velocity.current.x -= acceleration * delta;
@@ -208,38 +209,23 @@ export function Spaceship() {
             explosionFlashRef.current.intensity = explosionIntensity.current * 10;
         }
 
-        // Thruster pulsing — reacts to bass like a heartbeat
-        const beatPulse = engine.isBeat ? 2.0 : 0;
-        let thrusterLengthScale = 0.3 + bass * 1.2 + beatPulse;
-        let thrusterIntensity = 1.0 + bass * 4 + beatPulse * 3 + explosionIntensity.current;
-        let thrusterWidth = 1.0 + bass * 0.5;
+        // 7. Chase Camera — smooth both position AND lookAt to prevent jitter
+        const lerpFactor = 1 - Math.pow(0.001, delta); // frame-rate independent smoothing
 
-        if (edmState === 'buildup') {
-            thrusterLengthScale *= 1.5;
-            thrusterIntensity *= 1.5;
-        } else if (edmState === 'drop') {
-            thrusterLengthScale *= 2.5;
-            thrusterIntensity *= 2.5;
-            thrusterWidth *= 1.3;
-        }
-
-        if (leftThrusterRef.current) {
-            leftThrusterRef.current.scale.set(thrusterWidth, thrusterLengthScale, thrusterWidth);
-            leftThrusterRef.current.material.emissiveIntensity = thrusterIntensity;
-        }
-        if (rightThrusterRef.current) {
-            rightThrusterRef.current.scale.set(thrusterWidth, thrusterLengthScale, thrusterWidth);
-            rightThrusterRef.current.material.emissiveIntensity = thrusterIntensity;
-        }
-
-        // 7. Chase Camera (reuse cached vector to avoid GC)
         _camTarget.current.set(
             logicalPos.current.x * 0.8,
             logicalPos.current.y + 4,
             shipRef.current.position.z + 10
         );
-        camera.position.lerp(_camTarget.current, 0.1);
-        camera.lookAt(logicalPos.current.x, logicalPos.current.y + 1, shipRef.current.position.z - 5);
+        camera.position.lerp(_camTarget.current, lerpFactor);
+
+        _lookTarget.current.set(
+            logicalPos.current.x,
+            logicalPos.current.y + 1,
+            shipRef.current.position.z - 5
+        );
+        _smoothLook.current.lerp(_lookTarget.current, lerpFactor);
+        camera.lookAt(_smoothLook.current);
     });
 
     return (
@@ -281,14 +267,25 @@ export function Spaceship() {
                     </mesh>
                 ))}
 
-                {/* Wingtip trails — follow X/Y movement direction */}
-                <group position={[-2.4, 0.2, 0.5]}>
-                    <Trail width={1.5} length={8} color="#ff007f" attenuation={(t) => t * t}>
+                {/* Engine exhaust trails — purple neon, behind the ship */}
+                <group position={[-0.4, 0, 2.0]}>
+                    <Trail width={2.5} length={16} color="#aa00ff" attenuation={(t) => t * t}>
                         <mesh visible={false} />
                     </Trail>
                 </group>
-                <group position={[2.4, 0.2, 0.5]}>
-                    <Trail width={1.5} length={8} color="#ff007f" attenuation={(t) => t * t}>
+                <group position={[0.4, 0, 2.0]}>
+                    <Trail width={2.5} length={16} color="#aa00ff" attenuation={(t) => t * t}>
+                        <mesh visible={false} />
+                    </Trail>
+                </group>
+                {/* Wingtip neon trails — thinner pink accents behind */}
+                <group position={[-2.4, 0.2, 0.9]}>
+                    <Trail width={1.0} length={10} color="#ff007f" attenuation={(t) => t * t}>
+                        <mesh visible={false} />
+                    </Trail>
+                </group>
+                <group position={[2.4, 0.2, 0.9]}>
+                    <Trail width={1.0} length={10} color="#ff007f" attenuation={(t) => t * t}>
                         <mesh visible={false} />
                     </Trail>
                 </group>
@@ -303,12 +300,6 @@ export function Spaceship() {
                     <torusGeometry args={[0.28, 0.04, 8, 16]} />
                     <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={4} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
                 </mesh>
-                {/* Left exhaust flame — big, pulsing with bass */}
-                <mesh ref={leftThrusterRef} position={[-0.4, 0, 1.5]} rotation={[Math.PI / 2, 0, 0]}>
-                    <cylinderGeometry args={[0.22, 0.05, 1.5, 8]} />
-                    <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
-                </mesh>
-
                 {/* Right engine nacelle — big horizontal cylinder */}
                 <mesh position={[0.4, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
                     <cylinderGeometry args={[0.3, 0.28, 1.2, 12]} />
@@ -319,11 +310,9 @@ export function Spaceship() {
                     <torusGeometry args={[0.28, 0.04, 8, 16]} />
                     <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={4} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
                 </mesh>
-                {/* Right exhaust flame — big, pulsing with bass */}
-                <mesh ref={rightThrusterRef} position={[0.4, 0, 1.5]} rotation={[Math.PI / 2, 0, 0]}>
-                    <cylinderGeometry args={[0.22, 0.05, 1.5, 8]} />
-                    <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
-                </mesh>
+
+                {/* Exhaust flames — separate component with layered cones */}
+                <ExhaustFlames shipRef={shipRef} />
             </group>
         </>
     );
