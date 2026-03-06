@@ -190,3 +190,44 @@ input[type=range]::-webkit-slider-runnable-track {
   background: var(--glass-border);
   border-radius: 2px;
 }
+/* Health Indicator (Hearts) */
+.health-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.heart {
+  font-size: 1.5rem;
+  color: var(--secondary-color);
+  filter: drop-shadow(0 0 5px var(--secondary-color));
+  transition: all 0.3s ease;
+}
+
+.heart.empty {
+  color: #333;
+  filter: none;
+  opacity: 0.5;
+}
+
+.game-status {
+  padding: 1rem;
+  margin-top: 1rem;
+  border: 1px solid var(--secondary-color);
+  text-align: center;
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 5px var(--secondary-color); }
+  50% { box-shadow: 0 0 20px var(--secondary-color); }
+  100% { box-shadow: 0 0 5px var(--secondary-color); }
+}
+
+.game-over-text {
+  color: var(--secondary-color);
+  font-weight: bold;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+}
