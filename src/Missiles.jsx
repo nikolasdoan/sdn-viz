@@ -40,13 +40,15 @@ export function Missiles() {
     const _dir = new THREE.Vector3();
     const _up = new THREE.Vector3(0, 1, 0);
 
-    // Ambient missile timer — spawns missiles even without enemies
-    const ambientTimer = useRef(0);
+
+    const _spawnDir = new THREE.Vector3();
 
     const spawnMissile = (mesh, data, x, y, z) => {
         mesh.position.set(x, y, z);
         const speed = data.baseSpeed * gameState.getWaveSpeedMultiplier();
-        data.velocity.set(0, 0, speed);
+        // Aim toward player from spawn position
+        _spawnDir.copy(gameState.shipPosition).sub(mesh.position).normalize();
+        data.velocity.copy(_spawnDir).multiplyScalar(speed);
         data.active = true;
         data.life = 0;
         data.nearMissChecked = false;
@@ -82,22 +84,6 @@ export function Missiles() {
             const idx = findInactive();
             if (idx === -1) break;
             spawnMissile(children[idx], missileData[idx], spawn.x, spawn.y, spawn.z);
-        }
-
-        // === AMBIENT MISSILE SPAWNING (ensures there are always some in play) ===
-        const activeCount = missileData.filter(d => d.active).length;
-        const minActive = Math.floor(3 + (gameState.wave - 1) * 1.5);
-
-        ambientTimer.current += delta;
-        if (activeCount < minActive && ambientTimer.current > 1.5) {
-            ambientTimer.current = 0;
-            const idx = findInactive();
-            if (idx !== -1) {
-                const spreadX = (Math.random() - 0.5) * 80;
-                const spreadY = (Math.random() - 0.5) * 60;
-                const spawnZ = -300 - Math.random() * 200;
-                spawnMissile(children[idx], missileData[idx], spreadX, spreadY, spawnZ);
-            }
         }
 
         // === UPDATE ALL ACTIVE MISSILES ===

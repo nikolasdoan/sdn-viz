@@ -1,31 +1,32 @@
-import React, { useRef, useMemo, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useRef, useMemo, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { engine } from './AudioEngine';
 import { gameState } from './GameState';
 
-const MAX_ENEMIES = 6;
-const SPAWN_INTERVAL = 8;
-const ENEMY_SPEED = 25;
+const MAX_ENEMIES = 8;
+const SPAWN_INTERVAL = 6;
+const ENEMY_SPEED = 20;
 
 export function EnemyShips() {
     const groupRef = useRef();
-    const spawnTimer = useRef(3);
+    const { camera } = useThree();
+    const spawnTimer = useRef(2);
     const flashTimers = useRef(new Array(MAX_ENEMIES).fill(0));
-
-    // Per-enemy fire cooldown (prevents spamming on every beat)
     const fireCooldowns = useRef(new Array(MAX_ENEMIES).fill(0));
 
     const enemyData = useMemo(() => {
         return Array.from({ length: MAX_ENEMIES }, (_, i) => ({
             id: i,
             active: false,
-            health: 3,
-            maxHealth: 3,
+            health: 5,
+            maxHealth: 5,
+            shieldHealth: 3,
+            maxShieldHealth: 3,
             speed: ENEMY_SPEED + Math.random() * 10,
             strafePhase: Math.random() * Math.PI * 2,
-            strafeSpeed: 0.5 + Math.random() * 0.5,
-            strafeRadius: 5 + Math.random() * 10,
+            strafeSpeed: 0.3 + Math.random() * 0.3,
+            strafeRadius: 3 + Math.random() * 6,
         }));
     }, []);
 
@@ -35,8 +36,13 @@ export function EnemyShips() {
             const data = enemyData[enemyId];
             if (!data || !data.active) return;
 
-            data.health -= 1;
-            flashTimers.current[enemyId] = 0.15;
+            if (data.shieldHealth > 0) {
+                data.shieldHealth -= 1;
+                flashTimers.current[enemyId] = 0.12;
+            } else {
+                data.health -= 1;
+                flashTimers.current[enemyId] = 0.15;
+            }
 
             if (data.health <= 0) {
                 const mesh = groupRef.current?.children[enemyId];
@@ -51,17 +57,20 @@ export function EnemyShips() {
     }, [enemyData]);
 
     const spawnEnemy = (mesh, data) => {
-        const spreadX = (Math.random() - 0.5) * 60;
-        const spreadY = (Math.random() - 0.5) * 30;
-        const spawnZ = -350 - Math.random() * 100;
+        const spreadX = (Math.random() - 0.5) * 50;
+        const spreadY = (Math.random() - 0.5) * 25;
+        const spawnZ = -200 - Math.random() * 80;
 
         mesh.position.set(spreadX, spreadY, spawnZ);
         data.active = true;
+        data.maxHealth = 5 + Math.floor((gameState.wave - 1) * 1.5);
         data.health = data.maxHealth;
-        data.speed = ENEMY_SPEED + Math.random() * 10 + (gameState.wave - 1) * 3;
+        data.maxShieldHealth = 3 + Math.floor((gameState.wave - 1));
+        data.shieldHealth = data.maxShieldHealth;
+        data.speed = ENEMY_SPEED + Math.random() * 10 + (gameState.wave - 1) * 2;
         data.strafePhase = Math.random() * Math.PI * 2;
         flashTimers.current[data.id] = 0;
-        fireCooldowns.current[data.id] = 1.0; // don't fire immediately after spawning
+        fireCooldowns.current[data.id] = 1.0;
     };
 
     useFrame((state, delta) => {
@@ -75,7 +84,7 @@ export function EnemyShips() {
 
         // Spawn timer
         spawnTimer.current += delta;
-        const interval = Math.max(SPAWN_INTERVAL - (gameState.wave - 1) * 0.8, 3);
+        const interval = Math.max(SPAWN_INTERVAL - (gameState.wave - 1) * 0.5, 2.5);
         if (spawnTimer.current >= interval) {
             spawnTimer.current = 0;
             for (let i = 0; i < MAX_ENEMIES; i++) {
@@ -115,65 +124,123 @@ export function EnemyShips() {
                 continue;
             }
 
-            // Report position
-            gameState.updateEnemyPosition(data.id, mesh.position.clone(), data.health);
+            // Report position (include shield info)
+            gameState.updateEnemyPosition(data.id, mesh.position.clone(), data.health, data.shieldHealth);
 
             // === FIRE MISSILES ON BEAT ===
             fireCooldowns.current[i] -= delta;
             if (isBeat && fireCooldowns.current[i] <= 0 && mesh.position.z < 0) {
-                // Fire! Queue a missile spawn at this enemy's position
                 gameState.missileSpawnQueue.push({
                     x: mesh.position.x,
                     y: mesh.position.y,
                     z: mesh.position.z,
                 });
 
-                // During drops, enemies fire more aggressively (shorter cooldown)
                 const cooldown = edmState === 'drop' ? 0.3 : edmState === 'buildup' ? 0.5 : 0.8;
                 fireCooldowns.current[i] = cooldown;
-
-                // Visual: flash engines on fire
                 flashTimers.current[i] = 0.08;
             }
 
-            // Hit flash / fire flash effect
+            // === VISUAL UPDATES ===
+            const bass = engine.averageBass || 0;
+
+            // Hit flash effect on hull [0]
+            const hull = mesh.children[0];
             if (flashTimers.current[i] > 0) {
                 flashTimers.current[i] -= delta;
-                const hull = mesh.children[0];
                 if (hull && hull.material) {
-                    hull.material.emissiveIntensity = 8;
+                    hull.material.emissiveIntensity = data.shieldHealth > 0 ? 2 : 8;
                 }
             } else {
-                const hull = mesh.children[0];
                 if (hull && hull.material) {
                     hull.material.emissiveIntensity = 0.5;
                 }
             }
 
-            // Pulsing engine glow — reacts to bass
-            const engineL = mesh.children[3];
-            const engineR = mesh.children[4];
-            const bass = engine.averageBass || 0;
+            // Pulsing engines [5,6]
+            const engineL = mesh.children[5];
+            const engineR = mesh.children[6];
             const pulse = 3 + bass * 4 + Math.sin(time * 10 + i) * 1.5;
             if (engineL && engineL.material) engineL.material.emissiveIntensity = pulse;
             if (engineR && engineR.material) engineR.material.emissiveIntensity = pulse;
 
-            // Neon strips pulse with music
-            const neonTop = mesh.children[5];
-            const neonBot = mesh.children[6];
+            // Neon strips [7,8]
+            const neonTop = mesh.children[7];
+            const neonBot = mesh.children[8];
             const neonPulse = 2 + bass * 3 + Math.sin(time * 6 + i * 2) * 1;
             if (neonTop && neonTop.material) neonTop.material.emissiveIntensity = neonPulse;
             if (neonBot && neonBot.material) neonBot.material.emissiveIntensity = neonPulse;
+
+            // === SHIELD BUBBLE [9] ===
+            const shield = mesh.children[9];
+            if (shield) {
+                if (data.shieldHealth > 0) {
+                    shield.visible = true;
+                    const shieldPulse = 0.3 + Math.sin(time * 3 + i) * 0.1;
+                    shield.material.opacity = shieldPulse;
+                    shield.rotation.y = time * 0.5;
+                    shield.rotation.z = time * 0.3;
+                    // Flash on recent hit
+                    if (flashTimers.current[i] > 0) {
+                        shield.material.opacity = 0.8;
+                        shield.material.emissiveIntensity = 8;
+                    } else {
+                        shield.material.emissiveIntensity = 2;
+                    }
+                } else {
+                    shield.visible = false;
+                }
+            }
+
+            // === HEALTH BAR [10] — billboard group ===
+            const hpBarGroup = mesh.children[10];
+            if (hpBarGroup) {
+                // Billboard: face camera
+                hpBarGroup.lookAt(camera.position);
+
+                const totalMax = data.maxHealth + data.maxShieldHealth;
+                const totalCurrent = data.health + data.shieldHealth;
+
+                // Hull bar [0]
+                const hullBar = hpBarGroup.children[0];
+                if (hullBar) {
+                    const hullFrac = data.health / data.maxHealth;
+                    hullBar.scale.x = Math.max(hullFrac, 0.01);
+                    hullBar.position.x = -(1 - hullFrac) * 1.5;
+                    // Color shifts from green to red
+                    if (hullBar.material) {
+                        const r = 1 - hullFrac;
+                        const g = hullFrac;
+                        hullBar.material.color.setRGB(r, g, 0);
+                        hullBar.material.emissive.setRGB(r * 0.5, g * 0.3, 0);
+                    }
+                }
+
+                // Shield bar [1]
+                const shieldBar = hpBarGroup.children[1];
+                if (shieldBar) {
+                    if (data.shieldHealth > 0) {
+                        shieldBar.visible = true;
+                        const shieldFrac = data.shieldHealth / data.maxShieldHealth;
+                        shieldBar.scale.x = Math.max(shieldFrac, 0.01);
+                        shieldBar.position.x = -(1 - shieldFrac) * 1.5;
+                    } else {
+                        shieldBar.visible = false;
+                    }
+                }
+
+                // Background bar always full width [2]
+            }
         }
     });
 
     return (
         <group ref={groupRef}>
             {Array.from({ length: MAX_ENEMIES }, (_, i) => (
-                <group key={i} visible={false} scale={[2.2, 2.2, 2.2]}>
-                    {/* [0] Hull */}
+                <group key={i} visible={false} scale={[5, 5, 5]}>
+                    {/* [0] Hull — main body */}
                     <mesh>
-                        <boxGeometry args={[1.5, 0.3, 2.5]} />
+                        <boxGeometry args={[1.8, 0.4, 3]} />
                         <meshStandardMaterial
                             color="#331111"
                             emissive="#ff2200"
@@ -183,18 +250,40 @@ export function EnemyShips() {
                         />
                     </mesh>
                     {/* [1] Left wing */}
-                    <mesh position={[-1.5, 0, 0.3]} rotation={[0, 0, 0.15]}>
-                        <boxGeometry args={[1.8, 0.08, 0.8]} />
+                    <mesh position={[-1.8, 0, 0.3]} rotation={[0, 0, 0.12]}>
+                        <boxGeometry args={[2, 0.1, 1]} />
                         <meshStandardMaterial color="#220000" metalness={0.9} roughness={0.3} />
                     </mesh>
                     {/* [2] Right wing */}
-                    <mesh position={[1.5, 0, 0.3]} rotation={[0, 0, -0.15]}>
-                        <boxGeometry args={[1.8, 0.08, 0.8]} />
+                    <mesh position={[1.8, 0, 0.3]} rotation={[0, 0, -0.12]}>
+                        <boxGeometry args={[2, 0.1, 1]} />
                         <meshStandardMaterial color="#220000" metalness={0.9} roughness={0.3} />
                     </mesh>
-                    {/* [3] Left engine */}
-                    <mesh position={[-0.5, 0, 1.3]}>
-                        <cylinderGeometry args={[0.15, 0.05, 0.5, 8]} />
+                    {/* [3] Cockpit dome */}
+                    <mesh position={[0, 0.3, -0.8]}>
+                        <sphereGeometry args={[0.4, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+                        <meshStandardMaterial
+                            color="#440000"
+                            emissive="#ff0000"
+                            emissiveIntensity={1}
+                            metalness={0.7}
+                            roughness={0.3}
+                        />
+                    </mesh>
+                    {/* [4] Weapon turret */}
+                    <mesh position={[0, -0.25, -1.2]}>
+                        <cylinderGeometry args={[0.15, 0.15, 0.8, 6]} />
+                        <meshStandardMaterial
+                            color="#550000"
+                            emissive="#ff4400"
+                            emissiveIntensity={1.5}
+                            metalness={0.8}
+                            roughness={0.2}
+                        />
+                    </mesh>
+                    {/* [5] Left engine */}
+                    <mesh position={[-0.6, 0, 1.5]}>
+                        <cylinderGeometry args={[0.2, 0.08, 0.6, 8]} />
                         <meshStandardMaterial
                             color="#ff4400"
                             emissive="#ff2200"
@@ -203,9 +292,9 @@ export function EnemyShips() {
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    {/* [4] Right engine */}
-                    <mesh position={[0.5, 0, 1.3]}>
-                        <cylinderGeometry args={[0.15, 0.05, 0.5, 8]} />
+                    {/* [6] Right engine */}
+                    <mesh position={[0.6, 0, 1.5]}>
+                        <cylinderGeometry args={[0.2, 0.08, 0.6, 8]} />
                         <meshStandardMaterial
                             color="#ff4400"
                             emissive="#ff2200"
@@ -214,23 +303,69 @@ export function EnemyShips() {
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    {/* [5] Top neon strip */}
-                    <mesh position={[0, 0.18, 0]}>
-                        <boxGeometry args={[1.6, 0.04, 0.04]} />
+                    {/* [7] Top neon strip */}
+                    <mesh position={[0, 0.22, 0]}>
+                        <boxGeometry args={[1.9, 0.05, 0.05]} />
                         <meshStandardMaterial
                             color="#ff0000" emissive="#ff0000" emissiveIntensity={2}
                             blending={THREE.AdditiveBlending} transparent opacity={0.9}
                         />
                     </mesh>
-                    {/* [6] Bottom neon strip */}
-                    <mesh position={[0, -0.18, 0]}>
-                        <boxGeometry args={[1.6, 0.04, 0.04]} />
+                    {/* [8] Bottom neon strip */}
+                    <mesh position={[0, -0.22, 0]}>
+                        <boxGeometry args={[1.9, 0.05, 0.05]} />
                         <meshStandardMaterial
                             color="#ff4400" emissive="#ff4400" emissiveIntensity={2}
                             blending={THREE.AdditiveBlending} transparent opacity={0.9}
                         />
                     </mesh>
-                    <pointLight color="#ff2200" distance={12} intensity={2} />
+                    {/* [9] Shield bubble */}
+                    <mesh>
+                        <icosahedronGeometry args={[3.5, 1]} />
+                        <meshStandardMaterial
+                            color="#00ffff"
+                            emissive="#00aaff"
+                            emissiveIntensity={2}
+                            transparent
+                            opacity={0.3}
+                            blending={THREE.AdditiveBlending}
+                            depthWrite={false}
+                            wireframe
+                        />
+                    </mesh>
+                    {/* [10] Health bar group (billboard) */}
+                    <group position={[0, 2.2, 0]}>
+                        {/* Hull HP bar (red→green) */}
+                        <mesh position={[0, 0, 0]}>
+                            <boxGeometry args={[3, 0.2, 0.05]} />
+                            <meshStandardMaterial
+                                color="#00ff00"
+                                emissive="#00aa00"
+                                emissiveIntensity={1}
+                            />
+                        </mesh>
+                        {/* Shield HP bar (cyan, on top) */}
+                        <mesh position={[0, 0.25, 0]}>
+                            <boxGeometry args={[3, 0.15, 0.05]} />
+                            <meshStandardMaterial
+                                color="#00ffff"
+                                emissive="#00aaff"
+                                emissiveIntensity={2}
+                                transparent
+                                opacity={0.8}
+                            />
+                        </mesh>
+                        {/* Background bar */}
+                        <mesh position={[0, 0, -0.02]}>
+                            <boxGeometry args={[3.1, 0.55, 0.03]} />
+                            <meshStandardMaterial
+                                color="#111111"
+                                transparent
+                                opacity={0.6}
+                            />
+                        </mesh>
+                    </group>
+                    <pointLight color="#ff2200" distance={25} intensity={3} />
                 </group>
             ))}
         </group>

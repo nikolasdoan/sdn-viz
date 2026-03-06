@@ -180,8 +180,8 @@ class GameState {
     }
 
     // Enemy tracking
-    updateEnemyPosition(id, pos, health) {
-        this.enemyPositions.set(id, { pos, health });
+    updateEnemyPosition(id, pos, health, shieldHealth) {
+        this.enemyPositions.set(id, { pos, health, shieldHealth: shieldHealth || 0 });
     }
 
     removeEnemy(id) {

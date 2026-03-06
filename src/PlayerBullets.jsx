@@ -69,7 +69,7 @@ export function PlayerBullets() {
             gameState.enemyPositions.forEach((enemy, enemyId) => {
                 if (hitEnemy) return;
                 const dist = mesh.position.distanceTo(enemy.pos);
-                if (dist < 5.0) {
+                if (dist < 8.0) {
                     hitEnemy = true;
                     window.dispatchEvent(new CustomEvent('enemy-hit', { detail: { enemyId } }));
                     data.active = false;
