@@ -6,7 +6,7 @@ import { BlendFunction } from 'postprocessing';
 import { Particles } from './Particles';
 import { Lasers } from './Lasers';
 import { Waveforms } from './Waveform';
-import { Orbs } from './Orbs';
+import { Missiles } from './Missiles';
 import { Spaceship } from './Spaceship';
 
 export function VisualizerScene() {
@@ -28,7 +28,7 @@ export function VisualizerScene() {
             <Particles />
             <Lasers />
             <Waveforms />
-            <Orbs />
+            <Missiles />
             <Spaceship />
 
             {/* Orbit controls disabled to allow the Spaceship's Chase Cam to control the viewport */}

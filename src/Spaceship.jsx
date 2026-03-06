@@ -1,5 +1,6 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { Trail, Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { engine } from './AudioEngine';
 import { gameState } from './GameState';
@@ -75,23 +76,17 @@ export function Spaceship() {
         const bass = engine.averageBass || 0;
         const edmState = engine.currentState;
 
-        // 1. Collision Detection Logic
-        // We iterate through tracked orb positions in gameState
-        const shipBox = new THREE.Vector3(logicalPos.current.x, logicalPos.current.y, shipRef.current.position.z);
+        // Broadcast position for missile homing
+        gameState.updateShipPosition(shipRef.current.position);
 
-        gameState.orbPositions.forEach((orbPos, index) => {
-            // Precise Z distance check (avoiding math on distant orbs)
-            const distZ = Math.abs(orbPos.z - shipBox.z);
-            if (distZ < 2.0) {
-                const distXY = Math.sqrt(
-                    Math.pow(orbPos.x - shipBox.x, 2) +
-                    Math.pow(orbPos.y - shipBox.y, 2)
-                );
+        // 1. Collision Detection Logic (Missiles)
+        const shipBox = shipRef.current.position.clone();
 
-                // If ship is within the hitbox (orbs are roughly scale-based radius)
-                if (distXY < 2.5) {
-                    gameState.takeDamage();
-                }
+        gameState.missilePositions.forEach((missilePos, id) => {
+            const dist = shipBox.distanceTo(missilePos);
+            // Missiles are small, but let's give them a fair radius
+            if (dist < 1.8) {
+                gameState.takeDamage();
             }
         });
 
@@ -110,8 +105,9 @@ export function Spaceship() {
         logicalPos.current.x += velocity.current.x * delta;
         logicalPos.current.y += velocity.current.y * delta;
 
-        logicalPos.current.x = THREE.MathUtils.clamp(logicalPos.current.x, -50, 50);
-        logicalPos.current.y = THREE.MathUtils.clamp(logicalPos.current.y, -30, 30);
+        // Limit the ship slightly within a soft "viewport" area (but not a cage)
+        logicalPos.current.x = THREE.MathUtils.clamp(logicalPos.current.x, -80, 80);
+        logicalPos.current.y = THREE.MathUtils.clamp(logicalPos.current.y, -50, 50);
 
         // 3. Movement & Banking
         shipRef.current.position.x = logicalPos.current.x + Math.cos(time * 1.5) * 0.1;
@@ -175,6 +171,18 @@ export function Spaceship() {
                     <meshStandardMaterial color={part.color} metalness={0.8} roughness={0.2} />
                 </mesh>
             ))}
+
+            <group position={[-2.4, 0.2, 0.5]}>
+                <Trail width={1.5} length={8} color="#00ffff" attenuation={(t) => t * t}>
+                    <mesh visible={false} />
+                </Trail>
+            </group>
+
+            <group position={[2.4, 0.2, 0.5]}>
+                <Trail width={1.5} length={8} color="#00ffff" attenuation={(t) => t * t}>
+                    <mesh visible={false} />
+                </Trail>
+            </group>
 
             <mesh ref={leftThrusterRef} position={[-0.4, 0, 1.1]} rotation={[Math.PI / 2, 0, 0]}>
                 <cylinderGeometry args={[0.08, 0.02, 1, 12]} />

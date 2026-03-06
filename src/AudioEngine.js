@@ -17,6 +17,8 @@ export class AudioEngine {
     this.energyMap = [];
     this.currentState = 'chill'; // 'chill', 'buildup', 'drop'
     this.chunkDuration = 0.5; // Analyze energy in 0.5 second chunks
+    this.duration = 0;
+    this.currentTime = 0;
   }
 
   // Called when the user clicks Initialize
@@ -96,7 +98,10 @@ export class AudioEngine {
   }
 
   update() {
-    if (!this.isInitialized) return;
+    if (!this.isInitialized || !this.audioElement) return;
+
+    this.currentTime = this.audioElement.currentTime;
+    this.duration = this.audioElement.duration || 0;
 
     // --- 1. Update Real-Time FFT & Time Domain Data ---
     this.analyser.getByteFrequencyData(this.dataArray);

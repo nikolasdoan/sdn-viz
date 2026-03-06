@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 // Simple reactive state manager for game mechanics
 class GameState {
     constructor() {
@@ -7,9 +9,11 @@ class GameState {
         this.listeners = new Set();
         this.isInvincible = false;
 
-        // Track orb positions centrally for collision detection
-        // Keys are orb indices, values are THREE.Vector3
-        this.orbPositions = new Map();
+        // Track spaceship position for missile homing
+        this.shipPosition = new THREE.Vector3(0, -4, 5);
+
+        // Track missile positions centrally for collision detection
+        this.missilePositions = new Map();
     }
 
     subscribe(callback) {
@@ -50,8 +54,12 @@ class GameState {
         this.notify();
     }
 
-    updateOrbPosition(index, position) {
-        this.orbPositions.set(index, position);
+    updateMissilePosition(index, position) {
+        this.missilePositions.set(index, position);
+    }
+
+    updateShipPosition(position) {
+        this.shipPosition.copy(position);
     }
 }
 
