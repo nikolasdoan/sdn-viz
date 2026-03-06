@@ -596,3 +596,74 @@ input[type=range]::-webkit-slider-runnable-track {
   50% { opacity: 1; }
   100% { opacity: 0.5; }
 }
+
+/* Controls hint */
+.controls-hint {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 1.5px;
+  line-height: 1.6;
+  text-align: right;
+  pointer-events: none;
+}
+
+/* Mobile styles */
+.control-panel.mobile {
+  width: auto;
+  max-width: 90vw;
+  align-self: center;
+}
+
+.mobile-sample-btn {
+  width: 100%;
+  font-size: 0.85rem !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.mobile-hint {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #888;
+  letter-spacing: 1px;
+  text-align: center;
+  margin-top: 0.3rem;
+}
+
+@media (max-width: 768px) {
+  .ui-overlay {
+    padding: 1rem;
+  }
+
+  .title {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+  }
+
+  .header .subtitle {
+    font-size: 0.65rem;
+  }
+
+  .hud-right {
+    max-width: 45vw;
+  }
+
+  .score-display {
+    font-size: 1.2rem;
+  }
+
+  .wave-display {
+    font-size: 0.55rem;
+  }
+
+  .health-container {
+    font-size: 0.8rem;
+  }
+
+  .countdown-number {
+    font-size: 5rem;
+  }
+}

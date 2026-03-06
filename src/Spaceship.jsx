@@ -45,6 +45,36 @@ export function Spaceship() {
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
 
+        // Touch controls — touch position relative to screen center sets direction
+        const handleTouchStart = (e) => {
+            handleTouchMove(e);
+            // Auto-fire on touch
+            keys.current[' '] = true;
+        };
+        const handleTouchMove = (e) => {
+            if (e.touches.length === 0) return;
+            const touch = e.touches[0];
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+            const dx = (touch.clientX - cx) / cx; // -1 to 1
+            const dy = (touch.clientY - cy) / cy; // -1 to 1
+            const deadzone = 0.1;
+            keys.current.ArrowLeft = dx < -deadzone;
+            keys.current.ArrowRight = dx > deadzone;
+            keys.current.ArrowUp = dy < -deadzone;
+            keys.current.ArrowDown = dy > deadzone;
+        };
+        const handleTouchEnd = () => {
+            keys.current.ArrowUp = false;
+            keys.current.ArrowDown = false;
+            keys.current.ArrowLeft = false;
+            keys.current.ArrowRight = false;
+            keys.current[' '] = false;
+        };
+        window.addEventListener('touchstart', handleTouchStart, { passive: true });
+        window.addEventListener('touchmove', handleTouchMove, { passive: true });
+        window.addEventListener('touchend', handleTouchEnd);
+
         const onExplode = () => {
             explosionIntensity.current = 5.0;
         };
@@ -57,6 +87,9 @@ export function Spaceship() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('touchstart', handleTouchStart);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleTouchEnd);
             window.removeEventListener('ship-explosion', onExplode);
             unsubscribe();
         };
