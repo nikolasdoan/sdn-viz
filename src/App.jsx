@@ -16,6 +16,7 @@ function App() {
   // Capture mode state
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null); // 'listening' | 'playing' | null
+  const [capturePaused, setCapturePaused] = useState(false);
   const captureLoopRef = useRef(null);
 
   // HUD flash states
@@ -131,6 +132,12 @@ function App() {
       };
 
       await engine.initCapture();
+
+      // Start paused — user presses play when ready
+      const tracks = engine.captureStream.getAudioTracks();
+      tracks.forEach(t => { t.enabled = false; });
+      setCapturePaused(true);
+
       setIsCapturing(true);
       setIsPlaying(false);
       setCaptureStatus('listening');
@@ -162,6 +169,19 @@ function App() {
     engine.onSongEnd = null;
     setIsCapturing(false);
     setCaptureStatus(null);
+    setCapturePaused(false);
+  };
+
+  const toggleCapturePause = () => {
+    if (!engine.captureStream) return;
+    const tracks = engine.captureStream.getAudioTracks();
+    if (capturePaused) {
+      tracks.forEach(t => { t.enabled = true; });
+      setCapturePaused(false);
+    } else {
+      tracks.forEach(t => { t.enabled = false; });
+      setCapturePaused(true);
+    }
   };
 
   const handleRestart = () => {
@@ -245,9 +265,14 @@ function App() {
         {/* During active capture gameplay, hide the full panel — just show a small stop button */}
         {isCapturing && captureStatus === 'playing' ? (
           <div className="control-panel glass-panel" style={{ padding: '0.8rem' }}>
-            <button className="cyber-button capture-btn active" onClick={stopCapture} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
-              [ STOP CAPTURE ]
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button className="cyber-button capture-btn active" onClick={stopCapture} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                [ STOP CAPTURE ]
+              </button>
+              <button className="cyber-button play-btn" onClick={toggleCapturePause} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                {capturePaused ? '> PLAY' : '|| PAUSE'}
+              </button>
+            </div>
             {game.health <= 0 && (
               <div className="game-status">
                 <div className="game-over-text">SHIP CRITICAL</div>

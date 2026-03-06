@@ -86,9 +86,14 @@ export class AudioEngine {
     }
 
     // Request system/tab audio via getDisplayMedia
+    // Disable browser audio processing that can strip bass frequencies
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: true,  // required by browser, we ignore it
-      audio: true,
+      audio: {
+        autoGainControl: false,
+        noiseSuppression: false,
+        echoCancellation: false,
+      },
     });
 
     // Stop the video track immediately — we only need audio
@@ -101,19 +106,27 @@ export class AudioEngine {
 
     this.captureStream = stream;
 
-    // Create analyser — low latency for capture
+    // Create analyser — match file mode FFT for correct frequency resolution
     this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 512;  // smaller FFT = lower latency
+    this.analyser.fftSize = 1024;  // match file mode so bass bins cover the same frequencies
     this.analyser.smoothingTimeConstant = 0.85; // match file mode
     this.analyser.minDecibels = -100;
     this.analyser.maxDecibels = -10;
 
-    // Gentle boost — just enough to bring capture up, not flatten dynamics
-    this.captureGainNode = this.audioContext.createGain();
-    this.captureGainNode.gain.value = 2.0; // 2x hardware boost (gentle)
+    // Moderate bass shelf — compensate for browser capture attenuating lows
+    this.captureBassBoost = this.audioContext.createBiquadFilter();
+    this.captureBassBoost.type = 'lowshelf';
+    this.captureBassBoost.frequency.value = 250;  // boost below 250Hz
+    this.captureBassBoost.gain.value = 6;          // +6dB (moderate, won't clip)
 
+    // Overall gain boost
+    this.captureGainNode = this.audioContext.createGain();
+    this.captureGainNode.gain.value = 3.0; // 3x hardware boost
+
+    // Chain: source → bass boost → gain → analyser
     this.source = this.audioContext.createMediaStreamSource(stream);
-    this.source.connect(this.captureGainNode);
+    this.source.connect(this.captureBassBoost);
+    this.captureBassBoost.connect(this.captureGainNode);
     this.captureGainNode.connect(this.analyser);
     // Don't connect to destination — avoids feedback loop (audio already plays from the source app)
 
@@ -261,7 +274,7 @@ export class AudioEngine {
     // --- 2. Update EDM State Machine ---
     if (this.isCaptureMode) {
       // In capture mode, use real-time energy for state — thresholds match file mode feel
-      if (this.averageOverall > 0.31) {
+      if (this.averageOverall > 0.29) {
         this.currentState = 'drop';
       } else if (this.averageOverall > 0.18) {
         this.currentState = 'buildup';
