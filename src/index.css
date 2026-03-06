@@ -231,3 +231,135 @@ input[type=range]::-webkit-slider-runnable-track {
   margin-bottom: 0.5rem;
   letter-spacing: 2px;
 }
+
+.final-score {
+  color: var(--primary-color);
+  font-family: monospace;
+  font-size: 1.1rem;
+  margin-bottom: 0.8rem;
+  letter-spacing: 2px;
+}
+
+/* === HUD Right Panel (Score / Combo / Wave / Health) === */
+.hud-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.score-display {
+  font-family: monospace;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary-color);
+  text-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+  letter-spacing: 3px;
+}
+
+.combo-display {
+  font-family: monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffaa00;
+  text-shadow: 0 0 10px rgba(255, 170, 0, 0.6);
+  letter-spacing: 2px;
+  animation: combo-pulse 0.4s ease-out;
+}
+
+.wave-display {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+}
+
+/* === Center-screen Flash Overlays === */
+.hud-center-flash {
+  position: fixed;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  pointer-events: none;
+  text-align: center;
+}
+
+.near-miss-flash .flash-text {
+  font-family: monospace;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #ffaa00;
+  text-shadow: 0 0 30px rgba(255, 170, 0, 0.8), 0 0 60px rgba(255, 100, 0, 0.4);
+  letter-spacing: 6px;
+  animation: flash-in 1.2s ease-out forwards;
+}
+
+.near-miss-flash .flash-combo {
+  font-family: monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ff6600;
+  text-shadow: 0 0 20px rgba(255, 100, 0, 0.6);
+  letter-spacing: 4px;
+  animation: flash-in 1.2s ease-out forwards;
+}
+
+.wave-flash .wave-text {
+  font-family: monospace;
+  font-size: 4rem;
+  font-weight: 900;
+  color: var(--primary-color);
+  text-shadow: 0 0 40px rgba(0, 240, 255, 0.8), 0 0 80px rgba(0, 200, 255, 0.4);
+  letter-spacing: 10px;
+  animation: wave-announce 2.5s ease-out forwards;
+}
+
+.repair-flash .flash-text {
+  font-family: monospace;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #00ff66;
+  text-shadow: 0 0 30px rgba(0, 255, 100, 0.8), 0 0 60px rgba(0, 255, 70, 0.4);
+  letter-spacing: 6px;
+  animation: flash-in 1.5s ease-out forwards;
+}
+
+.kill-flash .flash-text {
+  font-family: monospace;
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #ff4444;
+  text-shadow: 0 0 30px rgba(255, 50, 50, 0.8), 0 0 60px rgba(255, 0, 0, 0.4);
+  letter-spacing: 6px;
+  animation: flash-in 1s ease-out forwards;
+}
+
+.powerup-flash .flash-text {
+  font-family: monospace;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #00ffaa;
+  text-shadow: 0 0 30px rgba(0, 255, 170, 0.8), 0 0 60px rgba(0, 255, 100, 0.4);
+  letter-spacing: 6px;
+  animation: flash-in 1.5s ease-out forwards;
+}
+
+@keyframes flash-in {
+  0% { opacity: 1; transform: scale(1.3); }
+  30% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.9) translateY(-20px); }
+}
+
+@keyframes wave-announce {
+  0% { opacity: 0; transform: scale(2); }
+  15% { opacity: 1; transform: scale(1); }
+  70% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8) translateY(-30px); }
+}
+
+@keyframes combo-pulse {
+  0% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}

@@ -13,6 +13,13 @@ export class AudioEngine {
     this.averageMid = 0;
     this.averageOverall = 0;
 
+    // Beat detection
+    this.prevBass = 0;
+    this.beatCooldown = 0;        // prevents double-triggering
+    this.isBeat = false;          // true on the frame a beat is detected
+    this.beatThreshold = 0.15;    // minimum bass spike to count as beat
+    this.beatCooldownTime = 0.12; // minimum seconds between beats
+
     // Pre-Analysis EDM State Data
     this.energyMap = [];
     this.currentState = 'chill'; // 'chill', 'buildup', 'drop'
@@ -123,6 +130,18 @@ export class AudioEngine {
     for (let i = 0; i < this.dataArray.length; i++) totalSum += this.dataArray[i];
     this.averageOverall = totalSum / this.dataArray.length / 255.0;
 
+    // --- Beat Detection (transient spike on bass) ---
+    this.isBeat = false;
+    if (this.beatCooldown > 0) {
+      this.beatCooldown -= 1 / 60; // approximate frame time
+    } else {
+      const bassSpike = this.averageBass - this.prevBass;
+      if (bassSpike > this.beatThreshold && this.averageBass > 0.25) {
+        this.isBeat = true;
+        this.beatCooldown = this.beatCooldownTime;
+      }
+    }
+    this.prevBass = this.averageBass;
 
     // --- 2. Update EDM State Machine ---
     if (this.energyMap.length > 0 && this.audioElement) {
