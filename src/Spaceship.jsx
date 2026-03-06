@@ -1,0 +1,144 @@
+import React, { useRef, useMemo, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+import { engine } from './AudioEngine';
+
+export function Spaceship() {
+    const shipRef = useRef();
+    const leftThrusterRef = useRef();
+    const rightThrusterRef = useRef();
+    const { camera } = useThree();
+
+    // Store input state
+    const keys = useRef({
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false
+    });
+
+    // Physics state: Velocity and Position
+    const velocity = useRef({ x: 0, y: 0 });
+    const logicalPos = useRef({ x: 0, y: -4 });
+
+    useEffect(() => {
+        const handleKeyDown = (e) => { if (keys.current.hasOwnProperty(e.key)) keys.current[e.key] = true; };
+        const handleKeyUp = (e) => { if (keys.current.hasOwnProperty(e.key)) keys.current[e.key] = false; };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, []);
+
+    // Ship parts facing forward (-Z)
+    const shipParts = useMemo(() => [
+        // Main hull
+        { geo: new THREE.BoxGeometry(1.2, 0.4, 2), pos: [0, 0, 0], color: "#111111" },
+        // Cockpit glass (Facing -Z)
+        { geo: new THREE.BoxGeometry(0.8, 0.2, 0.6), pos: [0, 0.25, -0.4], color: "#00ffff" },
+        // Left wing (Further back)
+        { geo: new THREE.BoxGeometry(2, 0.1, 1), pos: [-1.4, -0.05, 0.2], rotation: [0, 0, -0.1], color: "#222222" },
+        // Right wing (Further back)
+        { geo: new THREE.BoxGeometry(2, 0.1, 1), pos: [1.4, -0.05, 0.2], rotation: [0, 0, 0.1], color: "#222222" },
+        // Left fin
+        { geo: new THREE.BoxGeometry(0.1, 0.6, 0.8), pos: [-2.4, 0.2, 0.5], color: "#333333" },
+        // Right fin
+        { geo: new THREE.BoxGeometry(0.1, 0.6, 0.8), pos: [2.4, 0.2, 0.5], color: "#333333" },
+    ], []);
+
+    useFrame((state, delta) => {
+        if (!shipRef.current) return;
+
+        const time = state.clock.getElapsedTime();
+        const bass = engine.averageBass || 0;
+        const edmState = engine.currentState;
+
+        // 1. Physics Engine (Acceleration and Friction)
+        const acceleration = 70;
+        const friction = 0.94; // Momentum coefficient
+
+        if (keys.current.ArrowLeft) velocity.current.x -= acceleration * delta;
+        if (keys.current.ArrowRight) velocity.current.x += acceleration * delta;
+        if (keys.current.ArrowUp) velocity.current.y += acceleration * delta;
+        if (keys.current.ArrowDown) velocity.current.y -= acceleration * delta;
+
+        // Apply friction
+        velocity.current.x *= friction;
+        velocity.current.y *= friction;
+
+        // Apply velocity to logical position
+        logicalPos.current.x += velocity.current.x * delta;
+        logicalPos.current.y += velocity.current.y * delta;
+
+        // Clamp world position
+        logicalPos.current.x = THREE.MathUtils.clamp(logicalPos.current.x, -50, 50);
+        logicalPos.current.y = THREE.MathUtils.clamp(logicalPos.current.y, -30, 30);
+
+        // Update ship position (with subtle bobbing)
+        shipRef.current.position.x = logicalPos.current.x + Math.cos(time * 1.5) * 0.1;
+        shipRef.current.position.y = logicalPos.current.y + Math.sin(time * 2) * 0.15;
+
+        // 2. Realistic Tilt/Bank based on velocity
+        const tiltZ = -velocity.current.x * 0.02;
+        const tiltX = velocity.current.y * 0.01;
+        const hoverRoll = Math.sin(time * 1.5) * 0.02;
+
+        shipRef.current.rotation.z = THREE.MathUtils.lerp(shipRef.current.rotation.z, tiltZ + hoverRoll, 0.1);
+        shipRef.current.rotation.x = THREE.MathUtils.lerp(shipRef.current.rotation.x, tiltX, 0.1);
+
+        // 3. Thruster Logic (Reduced scale/intensity per user request)
+        let thrusterLengthScale = 0.15 + (bass * 0.6);
+        let thrusterIntensity = 0.4 + (bass * 1.5);
+
+        if (edmState === 'buildup') {
+            thrusterLengthScale *= 1.5;
+            thrusterIntensity *= 1.5;
+        } else if (edmState === 'drop') {
+            thrusterLengthScale *= 2.5;
+            thrusterIntensity *= 2.5;
+        }
+
+        if (leftThrusterRef.current) {
+            leftThrusterRef.current.scale.set(0.5, thrusterLengthScale, 0.5);
+            leftThrusterRef.current.material.emissiveIntensity = thrusterIntensity;
+        }
+        if (rightThrusterRef.current) {
+            rightThrusterRef.current.scale.set(0.5, thrusterLengthScale, 0.5);
+            rightThrusterRef.current.material.emissiveIntensity = thrusterIntensity;
+        }
+
+        // 4. Chase Camera (Anchor to ship position)
+        // Camera stays at a fixed offset behind the ship, but lerps for "spring" feel
+        const targetCamPos = new THREE.Vector3(
+            logicalPos.current.x * 0.8, // Slightly lag behind X for perspective
+            logicalPos.current.y + 4, // Look down from above
+            shipRef.current.position.z + 10 // Stay 10 units back
+        );
+        camera.position.lerp(targetCamPos, 0.1);
+        camera.lookAt(logicalPos.current.x, logicalPos.current.y + 1, shipRef.current.position.z - 5);
+    });
+
+    return (
+        <group ref={shipRef} position={[0, -4, 5]}>
+            {shipParts.map((part, i) => (
+                <mesh key={i} position={part.pos} rotation={part.rotation || [0, 0, 0]}>
+                    <primitive object={part.geo} attach="geometry" />
+                    <meshStandardMaterial color={part.color} metalness={0.8} roughness={0.2} />
+                </mesh>
+            ))}
+
+            {/* Thrusters at the BACK (+Z) */}
+            <mesh ref={leftThrusterRef} position={[-0.4, 0, 1.1]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.08, 0.02, 1, 12]} />
+                <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.6} blending={THREE.AdditiveBlending} />
+            </mesh>
+
+            <mesh ref={rightThrusterRef} position={[0.4, 0, 1.1]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.08, 0.02, 1, 12]} />
+                <meshStandardMaterial color="#000000" emissive="#00ffff" emissiveIntensity={1} transparent opacity={0.6} blending={THREE.AdditiveBlending} />
+            </mesh>
+        </group>
+    );
+}

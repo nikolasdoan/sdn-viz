@@ -1,0 +1,41 @@
+To program a visualizer that realistically mimics festival lasers, you must move beyond simple "glowing lines" and simulate the physical mechanics of a Laser Projector and its interaction with the environment.
+1. Physics-Based Rendering (The "Look")
+Volumetric Scattering: Lasers are only visible in air because of haze or fog. In your engine (Unity, Unreal, or custom GLSL), use volumetric lighting or a Raymarching shader to simulate light scattering through a medium.
+Collimation & Divergence: Real lasers have near-zero divergence, meaning the beam stays a tight circle over long distances. Program your "beams" as extremely thin, high-intensity cylinders that do not widen significantly.
+Monochromaticity: Use pure, saturated RGB values (e.g., #00FF00 for green) rather than blended colors, as lasers emit light at specific, narrow wavelengths. 
+YouTube
+YouTube
+ +4
+2. Scanner Simulation (The "Movement")
+At a festival, lasers don't show an entire shape at once; a tiny mirror (galvanometer) moves a single dot so fast it looks like a shape. 
+arXiv
+arXiv
+ +4
+Persistence of Vision (POV): Instead of rendering a static mesh, program a "point" that travels along a path (e.g., a circle or fan) at high speed. Use a trailing effect or a decaying buffer to simulate how the human eye perceives the moving dot as a solid line.
+Scan Rates (Kpps): Professional lasers are rated in Kpps (Kilo-points per second). In your code, implement a "points-per-frame" limit. If your simulated "scanner" tries to draw a complex shape too fast, it should naturally start to "flicker" or round off sharp corners, just like a real laser. 
+YouTube
+YouTube
+ +4
+3. Dynamic Visual Effects
+Fans and Tunnels: These are created by oscillating the laser along a single axis (Fan) or in a circle (Tunnel).
+Audio-Reactive Modulation: Use Fast Fourier Transform (FFT) to map specific audio frequencies to laser parameters:
+Bass/Kick: Triggers "Shimmer" or rapid intensity strobing.
+Mids/Highs: Controls "Rotation" or "Scale" of the geometric patterns.
+Scan-Line "Rolling Shutter": For ultimate realism, add a post-processing effect that mimics how cameras record lasers—creating horizontal bands or broken lines. 
+YouTube
+YouTube
+ +4
+4. Industry Tools for Inspiration
+Technicians use professional software to design these shows. Study these to understand the "logic" of laser programming: 
+Pangolin BEYOND/QuickShow: The gold standard for designing laser frames and cues.
+TouchDesigner: A node-based visual programming environment excellent for creating "generative" laser content using its Points Operators (POPs).
+Resolume: Used by VJs to sync video content with lighting fixtures via DMX. 
+Resolume VJ Software
+Resolume VJ Software
+ +4
+Summary of Techniques
+Component 	Programming Technique
+Beam Visibility	Volumetric Raymarching / Haze simulation
+Shape Creation	Point-path traversal with persistence of vision
+Control Logic	DMX512 protocol simulation (attribute-based cues)
+Syncing	Timecode (SMPTE) or MIDI/OSC for audio reactivity
