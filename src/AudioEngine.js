@@ -31,6 +31,11 @@ export class AudioEngine {
     this.isCaptureMode = false;
     this.captureStream = null;
 
+    // Auto-gain for capture mode (normalizes lower signal levels)
+    this.captureGain = 1.0;
+    this.capturePeak = 0.0;
+    this.capturePeakDecay = 0.995; // slow decay so gain stays stable
+
     // Song detection for capture mode
     this.songPlaying = false;
     this.silenceTimer = 0;
@@ -114,6 +119,8 @@ export class AudioEngine {
     this.songPlaying = false;
     this.silenceTimer = 0;
     this.energyMap = [];
+    this.captureGain = 1.0;
+    this.capturePeak = 0.0;
 
     // Listen for the user stopping the share via browser UI
     audioTracks[0].addEventListener('ended', () => {
@@ -202,21 +209,40 @@ export class AudioEngine {
     this.analyser.getByteFrequencyData(this.dataArray);
     this.analyser.getByteTimeDomainData(this.timeDataArray);
 
+    // Auto-gain normalization for capture mode
+    // Tracks the running peak and scales signal so capture matches file-upload levels
+    if (this.isCaptureMode) {
+      let rawPeak = 0;
+      for (let i = 0; i < this.dataArray.length; i++) {
+        if (this.dataArray[i] > rawPeak) rawPeak = this.dataArray[i];
+      }
+      // Update running peak with slow decay
+      this.capturePeak = Math.max(rawPeak / 255.0, this.capturePeak * this.capturePeakDecay);
+      // Target: we want the peak to map to ~0.85 (leaving headroom)
+      if (this.capturePeak > 0.01) {
+        this.captureGain = Math.min(0.85 / this.capturePeak, 4.0); // cap at 4x to avoid noise amplification
+      }
+    } else {
+      this.captureGain = 1.0;
+    }
+
+    const gain = this.captureGain;
+
     let bassSum = 0;
     for (let i = 0; i < 7; i++) bassSum += this.dataArray[i];
-    this.averageBass = bassSum / 7 / 255.0;
+    this.averageBass = Math.min(bassSum / 7 / 255.0 * gain, 1.0);
 
     let midSum = 0;
     for (let i = 7; i < 50; i++) midSum += this.dataArray[i];
-    this.averageMid = midSum / (50 - 7) / 255.0;
+    this.averageMid = Math.min(midSum / (50 - 7) / 255.0 * gain, 1.0);
 
     let highSum = 0;
     for (let i = 50; i < 250; i++) highSum += this.dataArray[i];
-    this.averageHighs = highSum / (250 - 50) / 255.0;
+    this.averageHighs = Math.min(highSum / (250 - 50) / 255.0 * gain, 1.0);
 
     let totalSum = 0;
     for (let i = 0; i < this.dataArray.length; i++) totalSum += this.dataArray[i];
-    this.averageOverall = totalSum / this.dataArray.length / 255.0;
+    this.averageOverall = Math.min(totalSum / this.dataArray.length / 255.0 * gain, 1.0);
 
     // --- Beat Detection (transient spike on bass) ---
     this.isBeat = false;

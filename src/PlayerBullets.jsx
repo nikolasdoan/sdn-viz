@@ -3,10 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { gameState } from './GameState';
 
-const MAX_BULLETS = 80;
+const MAX_BULLETS = 50;
 const BULLET_SPEED = 250;
-const BULLET_MAX_DIST = 500;
-const TRAIL_LEN = 8;
+const BULLET_MAX_DIST = 300;
+const TRAIL_LEN = 4;
 
 export function PlayerBullets() {
     const groupRef = useRef();

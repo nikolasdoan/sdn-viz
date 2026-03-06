@@ -31,9 +31,8 @@ export function Spaceship() {
     const velocity = useRef({ x: 0, y: 0 });
     const logicalPos = useRef({ x: 0, y: -4 });
 
-    // Shooting cooldown
+    // Shooting cooldown — scales with weapon level to limit bullet count
     const shootCooldown = useRef(0);
-    const SHOOT_RATE = 0.12; // seconds between shots
 
 
     useEffect(() => {
@@ -151,10 +150,11 @@ export function Spaceship() {
             }
         }
 
-        // 2. Shooting
+        // 2. Shooting — higher levels fire slower to cap total bullet count
+        const shootRate = 0.12 + (gameState.weaponLevel - 1) * 0.03; // L1=0.12, L5=0.24
         shootCooldown.current -= delta;
         if (keys.current[' '] && shootCooldown.current <= 0 && gameState.health > 0) {
-            shootCooldown.current = SHOOT_RATE;
+            shootCooldown.current = shootRate;
             gameState.fireBullet(shipPos.x, shipPos.y, shipPos.z);
         }
 
