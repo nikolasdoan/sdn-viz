@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npx vite build:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:www.youtube.com)",
+      "Bash(curl:*)",
+      "Bash(python3:*)"
     ]
   }
 }

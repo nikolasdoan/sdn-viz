@@ -19,6 +19,9 @@ function App() {
   const [capturePaused, setCapturePaused] = useState(false);
   const captureLoopRef = useRef(null);
 
+  // Countdown state
+  const [countdown, setCountdown] = useState(null); // 3, 2, 1, 'GO' or null
+
   // HUD flash states
   const [nearMissFlash, setNearMissFlash] = useState(null);
   const [waveFlash, setWaveFlash] = useState(null);
@@ -86,6 +89,12 @@ function App() {
     }
   }, [isPlaying, isCapturing]);
 
+  const sampleTracks = [
+    { name: 'One Love', file: '/songs/WINARTA - One Love [NCS].mp3' },
+    { name: 'Burn it Down', file: '/songs/Robin Hustin & Jessica Chertock - Burn it Down [NCS].mp3' },
+    { name: 'Light It Up', file: '/songs/Robin Hustin x TobiMorrow - Light It Up (feat. Jex) [NCS].mp3' },
+  ];
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -114,6 +123,53 @@ function App() {
       setIsPlaying(true);
       gameState.reset();
     }
+  };
+
+  const startCountdown = () => {
+    return new Promise((resolve) => {
+      setCountdown(3);
+      setTimeout(() => setCountdown(2), 1000);
+      setTimeout(() => setCountdown(1), 2000);
+      setTimeout(() => {
+        setCountdown('GO');
+        setTimeout(() => {
+          setCountdown(null);
+          resolve();
+        }, 500);
+      }, 3000);
+    });
+  };
+
+  const handleSampleTrack = async (track) => {
+    if (isCapturing) stopCapture();
+
+    setFileName(track.name);
+    setIsAnalyzing(true);
+    if (isPlaying) setIsPlaying(false);
+
+    engine.init(audioRef.current);
+    if (engine.audioContext.state === 'suspended') {
+      await engine.audioContext.resume();
+    }
+
+    // Fetch the file for pre-analysis
+    const response = await fetch(track.file);
+    const blob = await response.blob();
+    const file = new File([blob], track.name, { type: blob.type });
+    await engine.analyzeTrack(file);
+
+    if (audioRef.current) {
+      audioRef.current.src = track.file;
+      audioRef.current.load();
+    }
+
+    setIsAnalyzing(false);
+    setHasStarted(true);
+    gameState.reset();
+
+    // Countdown then play
+    await startCountdown();
+    setIsPlaying(true);
   };
 
   // --- Capture Mode ---
@@ -230,12 +286,18 @@ function App() {
         </div>
       )}
 
+      {countdown !== null && (
+        <div className="countdown-overlay">
+          <div className="countdown-number">{countdown}</div>
+        </div>
+      )}
+
       <div className="ui-overlay">
         <header className="header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h1 className="title">EPIC_VISUALIZER.JS</h1>
-              <p className="subtitle">Grand Particles // Laser Core</p>
+              <h1 className="title">SOUND_VOYAGE.JS</h1>
+              <p className="subtitle"><a href="https://www.tecxmate.com" target="_blank" rel="noopener noreferrer" className="tecxmate-link">By TECXMATE.COM</a></p>
             </div>
 
             {/* Score + Combo + Health */}
@@ -285,33 +347,69 @@ function App() {
           </div>
         ) : (
           <div className="control-panel glass-panel">
-            <div className="file-upload-section">
-              <label className="cyber-button upload-btn">
-                {isAnalyzing ? '[ ANALYZING TRACK... ]' : 'LOCAL TRACK [BEST]'}
-                <input
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                  disabled={isAnalyzing}
-                />
-              </label>
-
-              {!isCapturing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-                  <button className="cyber-button capture-btn" onClick={handleCapture}>
-                    CAPTURE AUDIO [Chrome Only]
+            {/* Section 1: File Mode */}
+            <div className="input-section">
+              <div className="section-label">FILE MODE</div>
+              <div className="section-row">
+                <label className="cyber-button upload-btn">
+                  {isAnalyzing ? '[ ANALYZING... ]' : 'LOCAL TRACK [BEST]'}
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
+                    disabled={isAnalyzing}
+                  />
+                </label>
+                <span className="section-divider">or try</span>
+                {sampleTracks.map((track, i) => (
+                  <button
+                    key={i}
+                    className="cyber-button sample-btn"
+                    onClick={() => handleSampleTrack(track)}
+                    disabled={isAnalyzing}
+                  >
+                    {track.name}
                   </button>
-                  <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '1px' }}></span>
-                </div>
-              ) : (
-                <button className="cyber-button capture-btn active" onClick={stopCapture}>
-                  [ STOP CAPTURE ]
-                </button>
-              )}
-
-              <span className="file-name">{fileName}</span>
+                ))}
+              </div>
             </div>
+
+            {/* Section 2: Capture Mode */}
+            <div className="input-section">
+              <div className="section-label">CAPTURE MODE <span className="section-note">CHROME ONLY</span></div>
+              <div className="section-row">
+                {!isCapturing ? (
+                  <button className="cyber-button capture-btn" onClick={handleCapture}>
+                    CAPTURE AUDIO
+                  </button>
+                ) : (
+                  <button className="cyber-button capture-btn active" onClick={stopCapture}>
+                    [ STOP CAPTURE ]
+                  </button>
+                )}
+              </div>
+              <div className="capture-instructions">
+                <div>1. Open a recommended track below in another tab</div>
+                <div>2. Click CAPTURE AUDIO and select that tab (check "Share audio")</div>
+                <div>3. Come back here and press PLAY when ready</div>
+              </div>
+              {!hasStarted && !isAnalyzing && !isCapturing && (
+                <div className="recommended-tracks">
+                  <div className="recommended-label">RECOMMENDED TRACKS</div>
+                  <div className="recommended-list">
+                    <a href="https://www.youtube.com/watch?v=fg8dZH5VDAs" target="_blank" rel="noopener noreferrer">IÖN - Starlights</a>
+                    <a href="https://www.youtube.com/watch?v=Y2Sv_V7czgo" target="_blank" rel="noopener noreferrer">Trivecta - Ghost in the Machine</a>
+                    <a href="https://www.youtube.com/watch?v=9vKAt6FT3Qg" target="_blank" rel="noopener noreferrer">Kaskade - Obvious</a>
+                    <a href="https://www.youtube.com/watch?v=U9kaaBTzBCA" target="_blank" rel="noopener noreferrer">Atmosphere</a>
+                    <a href="https://www.youtube.com/watch?v=UKou-bIHgYA" target="_blank" rel="noopener noreferrer">Nu Aspect - Sweet Release</a>
+                    <a href="https://www.youtube.com/watch?v=c2t0UljO_AY" target="_blank" rel="noopener noreferrer">Virtual Self - a.i.ngel</a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <span className="file-name">{fileName}</span>
 
             {/* Capture mode: listening for audio */}
             {isCapturing && captureStatus === 'listening' && (

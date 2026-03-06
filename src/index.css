@@ -79,6 +79,17 @@ html,
   letter-spacing: 2px;
 }
 
+.tecxmate-link {
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.tecxmate-link:hover {
+  color: var(--primary-color);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
 /* Glassmorphism Panel */
 .glass-panel {
   background: var(--glass-bg);
@@ -94,7 +105,7 @@ html,
 
 .control-panel {
   align-self: flex-start;
-  width: 350px;
+  width: 420px;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -106,6 +117,70 @@ html,
   gap: 0.5rem;
 }
 
+.input-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.section-label {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #bbb;
+  letter-spacing: 3px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.section-note {
+  font-size: 0.6rem;
+  color: #888;
+  letter-spacing: 1px;
+  font-weight: 400;
+}
+
+.section-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.section-divider {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #777;
+  letter-spacing: 1px;
+}
+
+.capture-instructions {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #aaa;
+  line-height: 1.8;
+  text-align: left;
+  letter-spacing: 0.5px;
+  white-space: pre-line;
+}
+
+.cyber-button.sample-btn {
+  font-size: 0.7rem;
+  padding: 0.35rem 0.7rem;
+  border-color: #ff00aa;
+  color: #ff99dd;
+}
+
+.cyber-button.sample-btn:hover {
+  background: rgba(255, 0, 170, 0.15);
+  box-shadow: 0 0 8px rgba(255, 0, 170, 0.3);
+}
+
 .file-name {
   font-size: 0.8rem;
   color: var(--primary-color);
@@ -113,6 +188,46 @@ html,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Recommended Tracks */
+.recommended-tracks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.recommended-label {
+  font-size: 0.7rem;
+  color: #aaa;
+  letter-spacing: 2px;
+}
+
+.recommended-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  justify-content: center;
+}
+
+.recommended-list a {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #ff99dd;
+  text-decoration: none;
+  border: 1px solid rgba(255, 0, 170, 0.35);
+  padding: 0.3rem 0.6rem;
+  border-radius: 3px;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.recommended-list a:hover {
+  background: rgba(255, 0, 170, 0.15);
+  box-shadow: 0 0 8px rgba(255, 0, 170, 0.3);
+  color: #ffaadd;
 }
 
 /* Cyber Buttons */
@@ -387,6 +502,37 @@ input[type=range]::-webkit-slider-runnable-track {
   text-shadow: 0 0 30px rgba(0, 255, 170, 0.8), 0 0 60px rgba(0, 255, 100, 0.4);
   letter-spacing: 6px;
   animation: flash-in 1.5s ease-out forwards;
+}
+
+/* Countdown overlay */
+.countdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.countdown-number {
+  font-family: monospace;
+  font-size: 8rem;
+  font-weight: 900;
+  color: #00f0ff;
+  text-shadow: 0 0 40px rgba(0, 240, 255, 0.8), 0 0 80px rgba(0, 240, 255, 0.4), 0 0 120px rgba(0, 100, 255, 0.3);
+  letter-spacing: 8px;
+  animation: countdown-pulse 0.8s ease-out;
+}
+
+@keyframes countdown-pulse {
+  0% { transform: scale(1.5); opacity: 0; }
+  30% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 1; }
 }
 
 @keyframes flash-in {
