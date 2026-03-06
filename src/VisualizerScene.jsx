@@ -11,6 +11,7 @@ import { PlayerBullets } from './PlayerBullets';
 import { EnemyShips } from './EnemyShips';
 import { Spaceship } from './Spaceship';
 import { WeaponPowerUps } from './WeaponPowerUp';
+import { EnemyLasers } from './EnemyLasers';
 
 export function VisualizerScene() {
     return (
@@ -30,6 +31,7 @@ export function VisualizerScene() {
             <EnemyShips />
             <PlayerBullets />
             <WeaponPowerUps />
+            <EnemyLasers />
             <Spaceship />
 
             <EffectComposer disableNormalPass multisampling={4}>

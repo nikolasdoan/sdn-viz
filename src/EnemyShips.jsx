@@ -14,6 +14,7 @@ export function EnemyShips() {
     const spawnTimer = useRef(2);
     const flashTimers = useRef(new Array(MAX_ENEMIES).fill(0));
     const fireCooldowns = useRef(new Array(MAX_ENEMIES).fill(0));
+    const laserCooldowns = useRef(new Array(MAX_ENEMIES).fill(0));
 
     const enemyData = useMemo(() => {
         return Array.from({ length: MAX_ENEMIES }, (_, i) => ({
@@ -71,6 +72,7 @@ export function EnemyShips() {
         data.strafePhase = Math.random() * Math.PI * 2;
         flashTimers.current[data.id] = 0;
         fireCooldowns.current[data.id] = 1.0;
+        laserCooldowns.current[data.id] = 2.0;
     };
 
     useFrame((state, delta) => {
@@ -115,7 +117,8 @@ export function EnemyShips() {
             mesh.position.x += Math.sin(data.strafePhase) * data.strafeRadius * delta;
             mesh.position.y += Math.cos(data.strafePhase * 0.7) * data.strafeRadius * 0.5 * delta;
 
-            mesh.rotation.x = Math.PI * 0.1;
+            // Face the player: rotate 180° around Y so cockpit points +Z
+            mesh.rotation.set(0, Math.PI, 0);
 
             // Reset if flew past player
             if (mesh.position.z > 25) {
@@ -129,16 +132,38 @@ export function EnemyShips() {
 
             // === FIRE MISSILES ON BEAT ===
             fireCooldowns.current[i] -= delta;
+            const waveFactor = Math.min(gameState.wave * 0.15, 0.6); // up to 60% faster
             if (isBeat && fireCooldowns.current[i] <= 0 && mesh.position.z < 0) {
-                gameState.missileSpawnQueue.push({
+                // Fire more missiles at higher waves
+                const shotsPerVolley = Math.min(1 + Math.floor((gameState.wave - 1) / 2), 3);
+                for (let s = 0; s < shotsPerVolley; s++) {
+                    gameState.missileSpawnQueue.push({
+                        x: mesh.position.x + (s - (shotsPerVolley - 1) / 2) * 2,
+                        y: mesh.position.y,
+                        z: mesh.position.z,
+                    });
+                }
+
+                const baseCooldown = edmState === 'drop' ? 0.3 : edmState === 'buildup' ? 0.5 : 0.8;
+                fireCooldowns.current[i] = baseCooldown * (1 - waveFactor);
+                flashTimers.current[i] = 0.08;
+            }
+
+            // === FIRE LASER BOLTS (between missile volleys) ===
+            laserCooldowns.current[i] -= delta;
+            const laserRate = edmState === 'drop' ? 0.2 : edmState === 'buildup' ? 0.4 : 0.6;
+            const laserCooldown = laserRate * (1 - waveFactor * 0.5);
+            if (laserCooldowns.current[i] <= 0 && mesh.position.z < -5) {
+                const shipPos = gameState.shipPosition;
+                gameState.enemyLaserQueue.push({
                     x: mesh.position.x,
                     y: mesh.position.y,
                     z: mesh.position.z,
+                    tx: shipPos.x,
+                    ty: shipPos.y,
+                    tz: shipPos.z,
                 });
-
-                const cooldown = edmState === 'drop' ? 0.3 : edmState === 'buildup' ? 0.5 : 0.8;
-                fireCooldowns.current[i] = cooldown;
-                flashTimers.current[i] = 0.08;
+                laserCooldowns.current[i] = laserCooldown;
             }
 
             // === VISUAL UPDATES ===

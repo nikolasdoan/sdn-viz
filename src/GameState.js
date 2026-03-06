@@ -37,6 +37,10 @@ class GameState {
         // Missile spawn queue — enemies push spawn requests here, Missiles component consumes
         this.missileSpawnQueue = []; // { x, y, z }
 
+        // Enemy laser spawn queue — enemies fire laser bolts, EnemyLasers component consumes
+        this.enemyLaserQueue = []; // { x, y, z, tx, ty, tz } — position + target
+        this.enemyLaserPositions = new Map(); // id -> Vector3 (for collision with player)
+
         // Weapon power-up system (Chicken Invader style)
         this.weaponLevel = 1; // 1-5
         this.powerUpQueue = []; // queued power-up spawn positions
@@ -222,7 +226,17 @@ class GameState {
         }
         this.isInvincible = false;
         this.missilePositions.clear();
+        this.enemyLaserQueue = [];
+        this.enemyLaserPositions.clear();
         this.notify();
+    }
+
+    updateEnemyLaserPosition(id, position) {
+        this.enemyLaserPositions.set(id, position);
+    }
+
+    removeEnemyLaser(id) {
+        this.enemyLaserPositions.delete(id);
     }
 
     updateMissilePosition(index, position) {

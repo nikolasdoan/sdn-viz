@@ -127,11 +127,17 @@ export function Spaceship() {
         gameState.updateShipPosition(shipRef.current.position);
         gameState.updateFrame(delta, edmState);
 
-        // 1. Collision Detection (Missiles) — radius 1.8
+        // 1. Collision Detection (Missiles + Enemy Lasers)
         const shipPos = shipRef.current.position;
         gameState.missilePositions.forEach((missilePos) => {
             const dist = shipPos.distanceTo(missilePos);
             if (dist < 1.8) {
+                gameState.takeDamage();
+            }
+        });
+        gameState.enemyLaserPositions.forEach((laserPos) => {
+            const dist = shipPos.distanceTo(laserPos);
+            if (dist < 1.5) {
                 gameState.takeDamage();
             }
         });
