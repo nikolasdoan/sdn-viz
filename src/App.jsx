@@ -255,6 +255,23 @@ function App() {
     gameState.reset();
   };
 
+  if (isMobile) {
+    return (
+      <div className="mobile-block">
+        <h1 className="title" style={{ fontSize: '1.5rem' }}>SOUND_VOYAGE.JS</h1>
+        <p style={{ color: '#aaa', fontSize: '0.9rem', lineHeight: 1.8, maxWidth: '300px', textAlign: 'center' }}>
+          This experience is designed for desktop.
+        </p>
+        <p style={{ color: '#00f0ff', fontSize: '0.85rem', letterSpacing: '1.5px', marginTop: '1rem' }}>
+          Please open on a desktop Chromium browser (Chrome, Edge, Brave) for the best experience.
+        </p>
+        <a href="https://www.tecxmate.com" target="_blank" rel="noopener noreferrer" className="tecxmate-link" style={{ marginTop: '2rem', fontSize: '0.7rem', color: '#666', letterSpacing: '2px' }}>
+          TECXMATE.COM
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       <audio ref={audioRef} crossOrigin="anonymous" loop />
@@ -335,164 +352,94 @@ function App() {
           </div>
         </header>
 
-        {/* Mobile: hide panel during active gameplay */}
-        {isMobile && hasStarted && isPlaying && game.health > 0 ? null : (
-          <>
-            {/* Active gameplay — minimal controls (capture or local file) */}
-            {hasStarted && !isMobile && (isCapturing ? captureStatus === 'playing' : !isAnalyzing) ? (
-              <div className="control-panel glass-panel" style={{ padding: '0.8rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  {isCapturing && (
-                    <button className="cyber-button capture-btn active" onClick={stopCapture} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
-                      [ STOP CAPTURE ]
-                    </button>
-                  )}
-                  <button className="cyber-button play-btn" onClick={isCapturing ? toggleCapturePause : () => setIsPlaying(!isPlaying)} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
-                    {(isCapturing ? capturePaused : !isPlaying) ? '> PLAY' : '|| PAUSE'}
-                  </button>
-                  <button className="cyber-button home-btn" onClick={handleHome} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
-                    [ HOME ]
-                  </button>
-                </div>
-                {game.health <= 0 && (
-                  <div className="game-status">
-                    <div className="game-over-text">SHIP CRITICAL</div>
-                    <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
-                    <button className="cyber-button primary-btn" onClick={handleRestart}>
-                      [ REPAIR & RESTART ]
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : isMobile && hasStarted && game.health <= 0 ? (
-              /* Mobile game-over: show restart + track select */
-              <div className="control-panel glass-panel mobile">
-                <div className="game-status">
-                  <div className="game-over-text">SHIP CRITICAL</div>
-                  <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
-                  <button className="cyber-button primary-btn" onClick={handleRestart}>
-                    [ REPAIR & RESTART ]
-                  </button>
-                </div>
-                <div className="input-section">
-                  <div className="section-label">SELECT A TRACK</div>
-                  <div className="section-row" style={{ flexDirection: 'column' }}>
-                    {sampleTracks.map((track, i) => (
-                      <button key={i} className="cyber-button sample-btn mobile-sample-btn" onClick={() => handleSampleTrack(track)}>
-                        {track.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Default panel */
-              <div className={`control-panel glass-panel ${isMobile ? 'mobile' : ''}`}>
-                {isMobile ? (
-                  <>
-                    <div className="input-section">
-                      <div className="section-label">SELECT A TRACK</div>
-                      <div className="section-row" style={{ flexDirection: 'column' }}>
-                        {sampleTracks.map((track, i) => (
-                          <button key={i} className="cyber-button sample-btn mobile-sample-btn" onClick={() => handleSampleTrack(track)} disabled={isAnalyzing}>
-                            {isAnalyzing ? '[ ANALYZING... ]' : track.name}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="mobile-hint">Touch to move ship — auto-fires</div>
-                    </div>
-                    {!hasStarted && !isAnalyzing && (
-                      <p className="subtitle" style={{ textAlign: "center" }}>Pick a song to start playing</p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="input-section">
-                      <div className="section-label">FILE MODE</div>
-                      <div className="section-row">
-                        <label className="cyber-button upload-btn">
-                          {isAnalyzing ? '[ ANALYZING... ]' : 'LOCAL TRACK [BEST]'}
-                          <input type="file" accept="audio/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={isAnalyzing} />
-                        </label>
-                        <span className="section-divider">or try</span>
-                        {sampleTracks.map((track, i) => (
-                          <button key={i} className="cyber-button sample-btn" onClick={() => handleSampleTrack(track)} disabled={isAnalyzing}>
-                            {track.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="input-section">
-                      <div className="section-label">CAPTURE MODE <span className="section-note">CHROME ONLY</span></div>
-                      <div className="section-row">
-                        {!isCapturing ? (
-                          <button className="cyber-button capture-btn" onClick={handleCapture}>CAPTURE AUDIO</button>
-                        ) : (
-                          <button className="cyber-button capture-btn active" onClick={stopCapture}>[ STOP CAPTURE ]</button>
-                        )}
-                      </div>
-                      <div className="capture-instructions">
-                        <div>1. Open a recommended track below in another tab</div>
-                        <div>2. Click CAPTURE AUDIO and select that tab (check "Share audio")</div>
-                        <div>3. Come back here and press PLAY when ready</div>
-                      </div>
-                      {!hasStarted && !isAnalyzing && !isCapturing && (
-                        <div className="recommended-tracks">
-                          <div className="recommended-label">RECOMMENDED TRACKS</div>
-                          <div className="recommended-list">
-                            <a href="https://www.youtube.com/watch?v=fg8dZH5VDAs" target="_blank" rel="noopener noreferrer">IÖN - Starlights</a>
-                            <a href="https://www.youtube.com/watch?v=Y2Sv_V7czgo" target="_blank" rel="noopener noreferrer">Trivecta - Ghost in the Machine</a>
-                            <a href="https://www.youtube.com/watch?v=9vKAt6FT3Qg" target="_blank" rel="noopener noreferrer">Kaskade - Obvious</a>
-                            <a href="https://www.youtube.com/watch?v=U9kaaBTzBCA" target="_blank" rel="noopener noreferrer">Atmosphere</a>
-                            <a href="https://www.youtube.com/watch?v=UKou-bIHgYA" target="_blank" rel="noopener noreferrer">Nu Aspect - Sweet Release</a>
-                            <a href="https://www.youtube.com/watch?v=c2t0UljO_AY" target="_blank" rel="noopener noreferrer">Virtual Self - a.i.ngel</a>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <span className="file-name">{fileName}</span>
-
-                    {isCapturing && captureStatus === 'listening' && (
-                      <p className="subtitle capture-listening" style={{ textAlign: "center" }}>Listening for audio... Play a song to begin.</p>
-                    )}
-
-                    {!hasStarted && !isAnalyzing && !isCapturing && (
-                      <p className="subtitle" style={{ textAlign: "center" }}>Please load an audio file or capture system audio to begin.</p>
-                    )}
-                  </>
-                )}
-
-                {hasStarted && !isAnalyzing && !isCapturing && !isMobile && (
-                  <>
-                    <div className="playback-controls">
-                      <button className="cyber-button play-btn" onClick={() => setIsPlaying(!isPlaying)}>
-                        {isPlaying ? '|| PAUSE' : '> PLAY'}
-                      </button>
-                    </div>
-                    {game.health <= 0 && (
-                      <div className="game-status">
-                        <div className="game-over-text">SHIP CRITICAL</div>
-                        <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
-                        <button className="cyber-button primary-btn" onClick={handleRestart}>[ REPAIR & RESTART ]</button>
-                      </div>
-                    )}
-                  </>
-                )}
+        {/* Active gameplay — minimal controls */}
+        {hasStarted && (isCapturing ? captureStatus === 'playing' : !isAnalyzing) ? (
+          <div className="control-panel glass-panel" style={{ padding: '0.8rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {isCapturing && (
+                <button className="cyber-button capture-btn active" onClick={stopCapture} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                  [ STOP CAPTURE ]
+                </button>
+              )}
+              <button className="cyber-button play-btn" onClick={isCapturing ? toggleCapturePause : () => setIsPlaying(!isPlaying)} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                {(isCapturing ? capturePaused : !isPlaying) ? '> PLAY' : '|| PAUSE'}
+              </button>
+              <button className="cyber-button home-btn" onClick={handleHome} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
+                [ HOME ]
+              </button>
+            </div>
+            {game.health <= 0 && (
+              <div className="game-status">
+                <div className="game-over-text">SHIP CRITICAL</div>
+                <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
+                <button className="cyber-button primary-btn" onClick={handleRestart}>
+                  [ REPAIR & RESTART ]
+                </button>
               </div>
             )}
-          </>
+          </div>
+        ) : (
+          <div className="control-panel glass-panel">
+            <div className="input-section">
+              <div className="section-label">FILE MODE</div>
+              <div className="section-row">
+                <label className="cyber-button upload-btn">
+                  {isAnalyzing ? '[ ANALYZING... ]' : 'LOCAL TRACK [BEST]'}
+                  <input type="file" accept="audio/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={isAnalyzing} />
+                </label>
+                <span className="section-divider">or try</span>
+                {sampleTracks.map((track, i) => (
+                  <button key={i} className="cyber-button sample-btn" onClick={() => handleSampleTrack(track)} disabled={isAnalyzing}>
+                    {track.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="input-section">
+              <div className="section-label">CAPTURE MODE <span className="section-note">CHROME ONLY</span></div>
+              <div className="section-row">
+                {!isCapturing ? (
+                  <button className="cyber-button capture-btn" onClick={handleCapture}>CAPTURE AUDIO</button>
+                ) : (
+                  <button className="cyber-button capture-btn active" onClick={stopCapture}>[ STOP CAPTURE ]</button>
+                )}
+              </div>
+              <div className="capture-instructions">
+                <div>1. Open a recommended track below in another tab</div>
+                <div>2. Click CAPTURE AUDIO and select that tab (check "Share audio")</div>
+                <div>3. Come back here and press PLAY when ready</div>
+              </div>
+              {!hasStarted && !isAnalyzing && !isCapturing && (
+                <div className="recommended-tracks">
+                  <div className="recommended-label">RECOMMENDED TRACKS</div>
+                  <div className="recommended-list">
+                    <a href="https://www.youtube.com/watch?v=fg8dZH5VDAs" target="_blank" rel="noopener noreferrer">IÖN - Starlights</a>
+                    <a href="https://www.youtube.com/watch?v=Y2Sv_V7czgo" target="_blank" rel="noopener noreferrer">Trivecta - Ghost in the Machine</a>
+                    <a href="https://www.youtube.com/watch?v=9vKAt6FT3Qg" target="_blank" rel="noopener noreferrer">Kaskade - Obvious</a>
+                    <a href="https://www.youtube.com/watch?v=U9kaaBTzBCA" target="_blank" rel="noopener noreferrer">Atmosphere</a>
+                    <a href="https://www.youtube.com/watch?v=UKou-bIHgYA" target="_blank" rel="noopener noreferrer">Nu Aspect - Sweet Release</a>
+                    <a href="https://www.youtube.com/watch?v=c2t0UljO_AY" target="_blank" rel="noopener noreferrer">Virtual Self - a.i.ngel</a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <span className="file-name">{fileName}</span>
+
+            {isCapturing && captureStatus === 'listening' && (
+              <p className="subtitle capture-listening" style={{ textAlign: "center" }}>Listening for audio... Play a song to begin.</p>
+            )}
+
+            {!hasStarted && !isAnalyzing && !isCapturing && (
+              <p className="subtitle" style={{ textAlign: "center" }}>Please load an audio file or capture system audio to begin.</p>
+            )}
+          </div>
         )}
-        {hasStarted && !isMobile && (
+        {hasStarted && (
           <div className="controls-hint">
             <div>ARROW KEYS — Move</div>
             <div>SPACE — Fire</div>
-          </div>
-        )}
-        {hasStarted && isMobile && (
-          <div className="controls-hint">
-            <div>TOUCH — Move & Fire</div>
           </div>
         )}
       </div>
