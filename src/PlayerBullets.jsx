@@ -3,14 +3,12 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { gameState } from './GameState';
 
-const MAX_BULLETS = 50;
+const MAX_BULLETS = 30;
 const BULLET_SPEED = 250;
 const BULLET_MAX_DIST = 300;
-const TRAIL_LEN = 4;
 
 export function PlayerBullets() {
     const groupRef = useRef();
-    const trailGroupRef = useRef();
 
     const bulletData = useMemo(() => {
         return Array.from({ length: MAX_BULLETS }, (_, i) => ({
@@ -18,18 +16,15 @@ export function PlayerBullets() {
             active: false,
             velocity: new THREE.Vector3(0, 0, -BULLET_SPEED),
             spawnZ: 0,
-            trailPositions: Array.from({ length: TRAIL_LEN }, () => new THREE.Vector3(0, 0, -9999)),
-            trailIndex: 0,
-            trailTimer: 0,
         }));
     }, []);
 
     useFrame((state, rawDelta) => {
-        if (!groupRef.current || !trailGroupRef.current) return;
+        if (!groupRef.current) return;
+        if (gameState.paused) return;
         const delta = Math.min(rawDelta, 0.05);
 
         const children = groupRef.current.children;
-        const trailChildren = trailGroupRef.current.children;
         const time = state.clock.elapsedTime;
 
         // Process queued bullet spawns
@@ -47,13 +42,6 @@ export function PlayerBullets() {
             const dx = spawn.dx || 0;
             data.velocity.set(dx * BULLET_SPEED, 0, -BULLET_SPEED);
             mesh.visible = true;
-
-            // Reset trail
-            for (let t = 0; t < TRAIL_LEN; t++) {
-                data.trailPositions[t].set(0, 0, -9999);
-            }
-            data.trailIndex = 0;
-            data.trailTimer = 0;
         }
 
         // Update active bullets
@@ -63,11 +51,6 @@ export function PlayerBullets() {
 
             if (!data.active) {
                 mesh.visible = false;
-                // Hide trail dots
-                for (let t = 0; t < TRAIL_LEN; t++) {
-                    const td = trailChildren[i * TRAIL_LEN + t];
-                    if (td) td.visible = false;
-                }
                 continue;
             }
 
@@ -80,7 +63,7 @@ export function PlayerBullets() {
                 continue;
             }
 
-            // Check collision with enemies — no closures
+            // Check collision with enemies
             let hitEnemy = false;
             for (const [enemyId, enemy] of gameState.enemyPositions) {
                 if (mesh.position.distanceTo(enemy.pos) < 8.0) {
@@ -101,33 +84,6 @@ export function PlayerBullets() {
                 if (core && core.material) {
                     core.material.emissiveIntensity = 8 + Math.sin(time * 30) * 3;
                 }
-
-                // Trail update
-                data.trailTimer += delta;
-                if (data.trailTimer > 0.015) {
-                    data.trailTimer = 0;
-                    data.trailPositions[data.trailIndex].copy(mesh.position);
-                    data.trailIndex = (data.trailIndex + 1) % TRAIL_LEN;
-                }
-
-                // Render trail dots
-                for (let t = 0; t < TRAIL_LEN; t++) {
-                    const td = trailChildren[i * TRAIL_LEN + t];
-                    if (!td) continue;
-                    const idx = (data.trailIndex + t) % TRAIL_LEN;
-                    const pos = data.trailPositions[idx];
-                    if (pos.z < -9000) {
-                        td.visible = false;
-                    } else {
-                        td.visible = true;
-                        td.position.copy(pos);
-                        const age = t / TRAIL_LEN;
-                        td.scale.setScalar(Math.max((1 - age) * 1.2, 0.1));
-                        if (td.material) {
-                            td.material.opacity = (1 - age) * 0.7;
-                        }
-                    }
-                }
             }
         }
 
@@ -140,71 +96,49 @@ export function PlayerBullets() {
     });
 
     return (
-        <>
-            {/* Trail dots — world space */}
-            <group ref={trailGroupRef}>
-                {Array.from({ length: MAX_BULLETS * TRAIL_LEN }, (_, i) => (
-                    <mesh key={i} visible={false}>
-                        <sphereGeometry args={[0.4, 4, 4]} />
+        <group ref={groupRef}>
+            {Array.from({ length: MAX_BULLETS }, (_, i) => (
+                <group key={i} visible={false}>
+                    {/* Bright inner core */}
+                    <mesh>
+                        <cylinderGeometry args={[0.4, 0.4, 5, 6]} />
                         <meshStandardMaterial
-                            color="#00aaff"
-                            emissive="#0066ff"
-                            emissiveIntensity={4}
+                            color="#00ffff"
+                            emissive="#00ffff"
+                            emissiveIntensity={10}
                             transparent
-                            opacity={0.6}
+                            opacity={0.95}
+                            blending={THREE.AdditiveBlending}
+                        />
+                    </mesh>
+                    {/* Wide glow halo */}
+                    <mesh>
+                        <cylinderGeometry args={[0.8, 0.8, 4, 6]} />
+                        <meshStandardMaterial
+                            color="#0088ff"
+                            emissive="#0066ff"
+                            emissiveIntensity={5}
+                            transparent
+                            opacity={0.5}
                             blending={THREE.AdditiveBlending}
                             depthWrite={false}
                         />
                     </mesh>
-                ))}
-            </group>
-
-            {/* Bullet heads */}
-            <group ref={groupRef}>
-                {Array.from({ length: MAX_BULLETS }, (_, i) => (
-                    <group key={i} visible={false}>
-                        {/* Bright inner core — very large */}
-                        <mesh>
-                            <cylinderGeometry args={[0.4, 0.4, 5, 6]} />
-                            <meshStandardMaterial
-                                color="#00ffff"
-                                emissive="#00ffff"
-                                emissiveIntensity={10}
-                                transparent
-                                opacity={0.95}
-                                blending={THREE.AdditiveBlending}
-                            />
-                        </mesh>
-                        {/* Wide glow halo */}
-                        <mesh>
-                            <cylinderGeometry args={[0.8, 0.8, 4, 6]} />
-                            <meshStandardMaterial
-                                color="#0088ff"
-                                emissive="#0066ff"
-                                emissiveIntensity={5}
-                                transparent
-                                opacity={0.5}
-                                blending={THREE.AdditiveBlending}
-                                depthWrite={false}
-                            />
-                        </mesh>
-                        {/* Outer aura */}
-                        <mesh>
-                            <cylinderGeometry args={[1.2, 1.2, 3, 6]} />
-                            <meshStandardMaterial
-                                color="#4400ff"
-                                emissive="#2200ff"
-                                emissiveIntensity={2}
-                                transparent
-                                opacity={0.2}
-                                blending={THREE.AdditiveBlending}
-                                depthWrite={false}
-                            />
-                        </mesh>
-                        <pointLight color="#00ccff" distance={12} intensity={2} />
-                    </group>
-                ))}
-            </group>
-        </>
+                    {/* Outer aura */}
+                    <mesh>
+                        <cylinderGeometry args={[1.2, 1.2, 3, 6]} />
+                        <meshStandardMaterial
+                            color="#4400ff"
+                            emissive="#2200ff"
+                            emissiveIntensity={2}
+                            transparent
+                            opacity={0.2}
+                            blending={THREE.AdditiveBlending}
+                            depthWrite={false}
+                        />
+                    </mesh>
+                </group>
+            ))}
+        </group>
     );
 }

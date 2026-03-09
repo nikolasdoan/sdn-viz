@@ -159,6 +159,14 @@ html,
   letter-spacing: 1px;
 }
 
+.capture-error {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #ff4444;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
 .capture-instructions {
   font-family: monospace;
   font-size: 0.7rem;
@@ -394,8 +402,17 @@ input[type=range]::-webkit-slider-runnable-track {
   color: var(--primary-color);
   font-family: monospace;
   font-size: 1.1rem;
+  margin-bottom: 0.3rem;
+  letter-spacing: 2px;
+}
+
+.high-score {
+  color: #ffaa00;
+  font-family: monospace;
+  font-size: 0.8rem;
   margin-bottom: 0.8rem;
   letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
 }
 
 /* === HUD Right Panel (Score / Combo / Wave / Health) === */
@@ -533,6 +550,45 @@ input[type=range]::-webkit-slider-runnable-track {
   0% { transform: scale(1.5); opacity: 0; }
   30% { transform: scale(1); opacity: 1; }
   100% { transform: scale(0.95); opacity: 1; }
+}
+
+/* Pause overlay */
+.pause-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.pause-text {
+  font-family: monospace;
+  font-size: 4rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(0, 240, 255, 0.6), 0 0 60px rgba(0, 240, 255, 0.3);
+  letter-spacing: 12px;
+  animation: pause-pulse 2s ease-in-out infinite;
+}
+
+.pause-hint {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #888;
+  letter-spacing: 2px;
+  margin-top: 1rem;
+}
+
+@keyframes pause-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 @keyframes flash-in {

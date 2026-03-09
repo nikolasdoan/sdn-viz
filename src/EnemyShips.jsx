@@ -88,6 +88,7 @@ export function EnemyShips() {
 
     useFrame((state, rawDelta) => {
         if (!groupRef.current) return;
+        if (gameState.paused) return;
         if (gameState.health <= 0) return;
         const delta = Math.min(rawDelta, 0.05);
 
@@ -208,13 +209,19 @@ export function EnemyShips() {
             if (neonTop && neonTop.material) neonTop.material.emissiveIntensity = neonPulse;
             if (neonBot && neonBot.material) neonBot.material.emissiveIntensity = neonPulse;
 
-            // === SHIELD BUBBLE [9] ===
+            // === SHIELD BUBBLE [9] — throbs and pulses with music ===
             const shield = mesh.children[9];
             if (shield) {
                 if (data.shieldHealth > 0) {
                     shield.visible = true;
-                    const shieldPulse = 0.3 + Math.sin(time * 3 + i) * 0.1;
+                    // Bass-reactive pulse — throbs with every beat
+                    const bassThrob = bass * 0.4;
+                    const shieldPulse = 0.25 + bassThrob + Math.sin(time * 3 + i) * 0.1;
                     shield.material.opacity = shieldPulse;
+                    // Scale throb — shield breathes with overall music intensity
+                    const intensity = Math.max(bass, engine.averageMid || 0, engine.averageHighs || 0);
+                    const shieldScale = 0.85 + intensity * 0.5 + bass * 0.25 + (isBeat ? 0.15 : 0);
+                    shield.scale.setScalar(shieldScale);
                     shield.rotation.y = time * 0.5;
                     shield.rotation.z = time * 0.3;
                     // Flash on recent hit
@@ -222,7 +229,7 @@ export function EnemyShips() {
                         shield.material.opacity = 0.8;
                         shield.material.emissiveIntensity = 8;
                     } else {
-                        shield.material.emissiveIntensity = 2;
+                        shield.material.emissiveIntensity = 2 + bass * 4;
                     }
                 } else {
                     shield.visible = false;

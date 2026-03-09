@@ -27,10 +27,10 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
     const lasersData = useMemo(() => {
         return Array.from({ length: count }, (_, i) => {
             const angle = Math.random() * Math.PI * 2;
-            const radius = 120 + Math.random() * 130;
+            const radius = 250 + Math.random() * 200;
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
-            const z = (Math.random() - 0.5) * 500;
+            const z = -200 + (Math.random() - 0.5) * 600;
 
             return {
                 initialZ: z,
@@ -61,16 +61,16 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
 
         if (edmState === 'chill') {
             flightSpeed = 20.0;
-            intensityMultiplier = 0.3;
-            scaleMultiplier = 0.5;
+            intensityMultiplier = 0.6;
+            scaleMultiplier = 0.7;
         } else if (edmState === 'buildup') {
             flightSpeed = 150.0;
-            intensityMultiplier = 0.6;
-            scaleMultiplier = 1.0;
+            intensityMultiplier = 1.0;
+            scaleMultiplier = 1.2;
         } else if (edmState === 'drop') {
             flightSpeed = 400.0;
-            intensityMultiplier = 0.8;
-            scaleMultiplier = 1.5;
+            intensityMultiplier = 1.4;
+            scaleMultiplier = 1.8;
         }
 
         cumulativeTime.current += delta * flightSpeed;
@@ -86,7 +86,7 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
             const mat = mesh.material;
 
             let currentZ = data.initialZ + cumulativeTime.current;
-            currentZ = ((currentZ + 450) % 500) - 450;
+            currentZ = ((currentZ + 600) % 800) - 700;
             mesh.position.z = currentZ;
 
             mesh.rotation.y += delta * 2.0;
@@ -103,13 +103,13 @@ function HyperspeedBeams({ count = 60, baseLength = 80 }) {
                 mat.emissive.g = Math.min(1, mat.emissive.g + timeShift * 0.5);
 
                 // Intensity reacts to beat pulse + audio
-                mat.emissiveIntensity = (0.3 + dominantIntensity * 3.0 + bp * 2.5) * intensityMultiplier;
+                mat.emissiveIntensity = (0.6 + dominantIntensity * 5.0 + bp * 3.5) * intensityMultiplier;
 
                 mesh.scale.x = 1 + (dominantScale * 1.5 + bp * 0.8) * scaleMultiplier;
                 mesh.scale.z = 1 + (dominantScale * 1.5 + bp * 0.8) * scaleMultiplier;
                 mesh.scale.y = 1 + (flightSpeed / 100.0) + bp * 0.5;
 
-                mat.opacity = 0.5 + dominantIntensity * 0.3 + bp * 0.15;
+                mat.opacity = 0.55 + dominantIntensity * 0.4 + bp * 0.2;
             } else {
                 mat.emissiveIntensity = 0.03;
                 mesh.scale.x = 0.5;

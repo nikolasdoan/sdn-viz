@@ -27,6 +27,7 @@ export function RepairOrbs() {
 
     useFrame((state, delta) => {
         if (!groupRef.current) return;
+        if (gameState.paused) return;
         if (gameState.health <= 0) return;
 
         const time = state.clock.elapsedTime;

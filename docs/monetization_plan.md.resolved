@@ -1,0 +1,61 @@
+# Monetization Implementation Plan: SoundVoyage.js Pro Tier
+
+This plan outlines the architectural and UI changes required to introduce a "Pro" tier to SoundVoyage.js. The goal is to create a premium feel that wows the user while providing clear value for upgrading.
+
+## 1. Core Architecture Changes
+
+### 1.1 [GameState.js](file:///Users/niko/antigravity/sdn-viz/src/GameState.js) Expansion
+- [ ] Add `userTier` property (values: `STANDARD`, `PRO`, `FOUNDER`).
+- [ ] Add `activeSkin` and `activeTheme` state.
+- [ ] Add `highFidelity` setting (Boolean).
+- [ ] Implement `checkFeatureAccess(featureId)` utility to handle gating logic.
+- [ ] Persist tier and basic settings in `localStorage`.
+
+### 1.2 [AudioEngine.js](file:///Users/niko/antigravity/sdn-viz/src/AudioEngine.js) Refinement
+- [ ] Ensure `currentState` detection remains robust for all tracks.
+- [ ] (Optional) Add "Pro" exclusive audio filters or visualizer sensitivities.
+
+## 2. Visual & Content System
+
+### 2.1 Skin Registry
+- [ ] **Standard Ship**: The current neon-cyan ship.
+- [ ] **Pro Ship 1 ("The Ghost")**: A glassmorphic, semi-transparent ship with trail effects.
+- [ ] **Pro Ship 2 ("The Aggressor")**: A sharp, multi-color ship with reactive pulsing wings.
+- [ ] **Founder Ship**: A special gold-accented ship for early supporters.
+
+### 2.2 Visual Themes
+- [ ] **Default**: The current deep space environment.
+- [ ] **Hyper-Grid**: A 80s synthwave stylized grid floor and ceiling.
+- [ ] **Nebula Drift**: A volumetric fog environment that reacts to bass spikes.
+
+### 2.3 Visualizer Post-Processing Gating
+- [ ] **Standard**: Basic Bloom and Glitch effects.
+- [ ] **Pro**: High-res SSR (Screen Space Reflections), Chromatic Aberration, and Motion Blur.
+
+## 3. UI/UX Enhancements
+
+### 3.1 "Join Pro" / Waitlist Flow
+- [ ] Add a `Join Pro` button in the header (glowing secondary color).
+- [ ] Create a `ProModal` displaying benefits:
+    - Exclusive Ships
+    - Premium Visual Themes
+    - Ultra-High Graphics Mode
+    - Future "Zen" Mode access
+- [ ] Implement an email capture form for the waitlist.
+
+### 3.2 Workspace & Settings
+- [ ] Add a `Settings` button in the UI.
+- [ ] Create a `Skins` selection panel (standard ships vs locked pro ships).
+- [ ] Add a `Graphics` toggle for "High-Fidelity Mode".
+
+### 3.3 New Game Modes
+- [ ] **Zen Mode** (Pro Only): No health, no enemies, just the flight and the music.
+- [ ] **Hardcore Mode**: 1-hit death, increased score multiplier.
+
+## 4. Implementation Steps
+
+1.  **Phase 1: Foundation** - Define tiers and update [GameState](file:///Users/niko/antigravity/sdn-viz/src/GameState.js#3-277).
+2.  **Phase 2: UI Overhaul** - Add the "Join Pro" buttons and the Skin selection panel.
+3.  **Phase 3: Visual Assets** - Create the Pro ship models and themes.
+4.  **Phase 4: Gating Logic** - Connect the UI settings to the R3F scene.
+5.  **Phase 5: Launch / Waitlist** - Deploy the waitlist capture system.

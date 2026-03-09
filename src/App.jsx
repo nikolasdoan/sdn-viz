@@ -6,11 +6,37 @@ import './index.css';
 
 const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="mobile-block">
+          <h1 className="title" style={{ fontSize: '1.5rem' }}>SOUND_VOYAGE.JS</h1>
+          <p style={{ color: '#aaa', fontSize: '0.9rem', lineHeight: 1.8, maxWidth: '400px', textAlign: 'center' }}>
+            Something went wrong. Your browser may not support WebGL.
+          </p>
+          <button className="cyber-button primary-btn" onClick={() => window.location.reload()} style={{ marginTop: '1.5rem' }}>
+            [ RELOAD ]
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [fileName, setFileName] = useState("No file selected");
-  const [game, setGame] = useState({ health: 5, maxHealth: 5, score: 0, combo: 1, wave: 1, kills: 0, weaponLevel: 1 });
+  const [game, setGame] = useState({ health: 5, maxHealth: 5, score: 0, combo: 1, wave: 1, kills: 0, weaponLevel: 1, highScore: 0 });
   const audioRef = useRef(null);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -19,6 +45,7 @@ function App() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null); // 'listening' | 'playing' | null
   const [capturePaused, setCapturePaused] = useState(false);
+  const [captureError, setCaptureError] = useState(null);
   const captureLoopRef = useRef(null);
 
   // Countdown state
@@ -45,6 +72,7 @@ function App() {
         wave: state.wave,
         kills: state.kills,
         weaponLevel: state.weaponLevel,
+        highScore: state.highScore,
       });
 
       // Process HUD flash events
@@ -73,22 +101,36 @@ function App() {
   }, []);
 
   // Auto-play / pause logic (file mode)
+  const fileLoopRef = useRef(null);
   useEffect(() => {
-    if (isCapturing) return; // capture mode handles its own loop
+    if (isCapturing) return;
     if (audioRef.current) {
       if (isPlaying) {
+        gameState.paused = false;
+        if (engine.audioContext && engine.audioContext.state === 'suspended') {
+          engine.audioContext.resume();
+        }
         audioRef.current.play();
         const updateLoop = () => {
-          if (isPlaying) {
-            engine.update();
-            requestAnimationFrame(updateLoop);
-          }
+          engine.update();
+          fileLoopRef.current = requestAnimationFrame(updateLoop);
         };
-        requestAnimationFrame(updateLoop);
+        fileLoopRef.current = requestAnimationFrame(updateLoop);
       } else {
+        gameState.paused = true;
+        if (fileLoopRef.current) {
+          cancelAnimationFrame(fileLoopRef.current);
+          fileLoopRef.current = null;
+        }
         audioRef.current.pause();
       }
     }
+    return () => {
+      if (fileLoopRef.current) {
+        cancelAnimationFrame(fileLoopRef.current);
+        fileLoopRef.current = null;
+      }
+    };
   }, [isPlaying, isCapturing]);
 
   const sampleTracks = [
@@ -107,23 +149,28 @@ function App() {
       setIsAnalyzing(true);
       if (isPlaying) setIsPlaying(false);
 
-      engine.init(audioRef.current);
-      if (engine.audioContext.state === 'suspended') {
-        await engine.audioContext.resume();
+      try {
+        engine.init(audioRef.current);
+        if (engine.audioContext.state === 'suspended') {
+          await engine.audioContext.resume();
+        }
+
+        await engine.analyzeTrack(file);
+
+        const fileUrl = URL.createObjectURL(file);
+        if (audioRef.current) {
+          audioRef.current.src = fileUrl;
+          audioRef.current.load();
+        }
+
+        setHasStarted(true);
+        setIsPlaying(true);
+        gameState.reset();
+      } catch (e) {
+        // Ensure UI doesn't stay stuck
+      } finally {
+        setIsAnalyzing(false);
       }
-
-      await engine.analyzeTrack(file);
-
-      const fileUrl = URL.createObjectURL(file);
-      if (audioRef.current) {
-        audioRef.current.src = fileUrl;
-        audioRef.current.load();
-      }
-
-      setIsAnalyzing(false);
-      setHasStarted(true);
-      setIsPlaying(true);
-      gameState.reset();
     }
   };
 
@@ -149,29 +196,33 @@ function App() {
     setIsAnalyzing(true);
     if (isPlaying) setIsPlaying(false);
 
-    engine.init(audioRef.current);
-    if (engine.audioContext.state === 'suspended') {
-      await engine.audioContext.resume();
+    try {
+      engine.init(audioRef.current);
+      if (engine.audioContext.state === 'suspended') {
+        await engine.audioContext.resume();
+      }
+
+      // Fetch the file for pre-analysis
+      const response = await fetch(track.file);
+      const blob = await response.blob();
+      const file = new File([blob], track.name, { type: blob.type });
+      await engine.analyzeTrack(file);
+
+      if (audioRef.current) {
+        audioRef.current.src = track.file;
+        audioRef.current.load();
+      }
+
+      setIsAnalyzing(false);
+      setHasStarted(true);
+      gameState.reset();
+
+      // Countdown then play
+      await startCountdown();
+      setIsPlaying(true);
+    } catch (e) {
+      setIsAnalyzing(false);
     }
-
-    // Fetch the file for pre-analysis
-    const response = await fetch(track.file);
-    const blob = await response.blob();
-    const file = new File([blob], track.name, { type: blob.type });
-    await engine.analyzeTrack(file);
-
-    if (audioRef.current) {
-      audioRef.current.src = track.file;
-      audioRef.current.load();
-    }
-
-    setIsAnalyzing(false);
-    setHasStarted(true);
-    gameState.reset();
-
-    // Countdown then play
-    await startCountdown();
-    setIsPlaying(true);
   };
 
   // --- Capture Mode ---
@@ -208,9 +259,12 @@ function App() {
       captureLoopRef.current = requestAnimationFrame(loop);
 
     } catch (err) {
-      console.error('Capture failed:', err);
       setCaptureStatus(null);
       setIsCapturing(false);
+      const msg = err.name === 'NotAllowedError' ? 'Capture was cancelled or denied.'
+        : 'Capture failed. Make sure to check "Share audio" when selecting a tab.';
+      setCaptureError(msg);
+      setTimeout(() => setCaptureError(null), 5000);
     }
   };
 
@@ -232,9 +286,11 @@ function App() {
     const tracks = engine.captureStream.getAudioTracks();
     if (capturePaused) {
       tracks.forEach(t => { t.enabled = true; });
+      gameState.paused = false;
       setCapturePaused(false);
     } else {
       tracks.forEach(t => { t.enabled = false; });
+      gameState.paused = true;
       setCapturePaused(true);
     }
   };
@@ -276,9 +332,11 @@ function App() {
     <div className="app-container">
       <audio ref={audioRef} crossOrigin="anonymous" loop />
 
-      <div className="canvas-wrapper">
-        <VisualizerScene />
-      </div>
+      <ErrorBoundary>
+        <div className="canvas-wrapper">
+          <VisualizerScene />
+        </div>
+      </ErrorBoundary>
 
       {/* Center-screen flash overlays */}
       {nearMissFlash && (
@@ -317,6 +375,14 @@ function App() {
       {countdown !== null && (
         <div className="countdown-overlay">
           <div className="countdown-number">{countdown}</div>
+        </div>
+      )}
+
+      {/* Pause overlay */}
+      {hasStarted && !isPlaying && !isCapturing && game.health > 0 && (
+        <div className="pause-overlay">
+          <div className="pause-text">PAUSED</div>
+          <div className="pause-hint">Press PLAY to resume</div>
         </div>
       )}
 
@@ -372,6 +438,9 @@ function App() {
               <div className="game-status">
                 <div className="game-over-text">SHIP CRITICAL</div>
                 <div className="final-score">SCORE: {Math.floor(game.score).toLocaleString()}</div>
+                {game.highScore > 0 && (
+                  <div className="high-score">BEST: {game.highScore.toLocaleString()}</div>
+                )}
                 <button className="cyber-button primary-btn" onClick={handleRestart}>
                   [ REPAIR & RESTART ]
                 </button>
@@ -404,6 +473,7 @@ function App() {
                 ) : (
                   <button className="cyber-button capture-btn active" onClick={stopCapture}>[ STOP CAPTURE ]</button>
                 )}
+                {captureError && <div className="capture-error">{captureError}</div>}
               </div>
               <div className="capture-instructions">
                 <div>1. Open a recommended track below in another tab</div>

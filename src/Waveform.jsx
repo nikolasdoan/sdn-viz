@@ -21,7 +21,10 @@ export function SingleWaveform({ sideX = -20 }) {
     }, []);
 
     // History array tracks the "envelope" of the waveform data flying towards the camera
+    // Pre-allocate pool to avoid per-frame object creation
     const history = useRef([]);
+    const historyPool = useRef(Array.from({ length: MAX_POINTS }, () => ({ z: 0, y: 0 })));
+    const poolIndex = useRef(0);
     const frameCount = useRef(0);
 
     useFrame((state, delta) => {
@@ -64,8 +67,12 @@ export function SingleWaveform({ sideX = -20 }) {
         const sign = (frameCount.current % 2 === 0) ? 1 : -1;
         const yValue = amplitude * sign;
 
-        // Spawn new audio chunk just barely out of view, closer to the camera (Z = -200 instead of -450)
-        history.current.unshift({ z: -200, y: yValue });
+        // Spawn new audio chunk — reuse pooled object to avoid GC pressure
+        const obj = historyPool.current[poolIndex.current];
+        poolIndex.current = (poolIndex.current + 1) % MAX_POINTS;
+        obj.z = -200;
+        obj.y = yValue;
+        history.current.unshift(obj);
 
         // Advance all history points forward (+Z) towards the camera
         for (let i = 0; i < history.current.length; i++) {
@@ -136,7 +143,7 @@ export function SingleWaveform({ sideX = -20 }) {
         });
     });
 
-    const offsets = [-1.5, -0.75, 0, 0.75, 1.5]; // Spacing to create "fat" rendering via multiple lines
+    const offsets = [-1.0, 0, 1.0]; // Spacing to create "fat" rendering via multiple lines
 
     return (
         <group>
@@ -160,13 +167,11 @@ export function SingleWaveform({ sideX = -20 }) {
 export function Waveforms() {
     return (
         <group>
-            {/* Stage Left Waveform (pushed out behind the light beams) */}
+            {/* Stage Left Waveform */}
             <SingleWaveform sideX={-120} />
-            <SingleWaveform sideX={-122} />
 
-            {/* Stage Right Waveform (pushed out behind the light beams) */}
+            {/* Stage Right Waveform */}
             <SingleWaveform sideX={120} />
-            <SingleWaveform sideX={122} />
         </group>
     );
 }

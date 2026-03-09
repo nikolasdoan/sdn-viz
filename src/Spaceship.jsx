@@ -133,6 +133,10 @@ export function Spaceship() {
         const edmState = engine.currentState;
 
         gameState.updateShipPosition(shipRef.current.position);
+
+        // Skip all gameplay logic when paused
+        if (gameState.paused) return;
+
         gameState.updateFrame(delta, edmState);
 
         // 1. Collision Detection (Missiles + Enemy Lasers) — no closures
@@ -269,23 +273,23 @@ export function Spaceship() {
 
                 {/* Engine exhaust trails — purple neon, behind the ship */}
                 <group position={[-0.4, 0, 2.0]}>
-                    <Trail width={2.5} length={16} color="#aa00ff" attenuation={(t) => t * t}>
+                    <Trail width={2.5} length={6} color="#aa00ff" attenuation={(t) => t * t}>
                         <mesh visible={false} />
                     </Trail>
                 </group>
                 <group position={[0.4, 0, 2.0]}>
-                    <Trail width={2.5} length={16} color="#aa00ff" attenuation={(t) => t * t}>
+                    <Trail width={2.5} length={6} color="#aa00ff" attenuation={(t) => t * t}>
                         <mesh visible={false} />
                     </Trail>
                 </group>
                 {/* Wingtip neon trails — thinner pink accents behind */}
                 <group position={[-2.4, 0.2, 0.9]}>
-                    <Trail width={1.0} length={10} color="#ff007f" attenuation={(t) => t * t}>
+                    <Trail width={1.0} length={4} color="#ff007f" attenuation={(t) => t * t}>
                         <mesh visible={false} />
                     </Trail>
                 </group>
                 <group position={[2.4, 0.2, 0.9]}>
-                    <Trail width={1.0} length={10} color="#ff007f" attenuation={(t) => t * t}>
+                    <Trail width={1.0} length={4} color="#ff007f" attenuation={(t) => t * t}>
                         <mesh visible={false} />
                     </Trail>
                 </group>

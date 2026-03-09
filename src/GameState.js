@@ -44,6 +44,12 @@ class GameState {
         // Weapon power-up system (Chicken Invader style)
         this.weaponLevel = 1; // 1-5
         this.powerUpQueue = []; // queued power-up spawn positions
+
+        // High score persistence
+        this.highScore = parseInt(localStorage.getItem('soundVoyage_highScore') || '0', 10);
+
+        // Pause flag — checked by all useFrame callbacks to freeze gameplay
+        this.paused = false;
     }
 
     subscribe(callback) {
@@ -67,6 +73,7 @@ class GameState {
             hudFlash: this.hudFlash,
             kills: this.kills,
             weaponLevel: this.weaponLevel,
+            highScore: this.highScore,
         };
     }
 
@@ -107,9 +114,18 @@ class GameState {
         }
     }
 
+    _saveHighScore() {
+        const finalScore = Math.floor(this.score);
+        if (finalScore > this.highScore) {
+            this.highScore = finalScore;
+            try { localStorage.setItem('soundVoyage_highScore', String(finalScore)); } catch (e) { /* quota exceeded */ }
+        }
+    }
+
     takeDamage() {
         if (this.isInvincible || this.health <= 0) return;
         this.health -= 1;
+        if (this.health <= 0) this._saveHighScore();
         this.combo = 1;
         this.comboTimer = 0;
         this.isInvincible = true;
@@ -135,6 +151,8 @@ class GameState {
 
     // Shooting — fires multiple bullets based on weapon level
     fireBullet(x, y, z) {
+        // Prevent queue overflow — drop oldest if too large
+        if (this.bulletQueue.length > 60) this.bulletQueue.length = 60;
         const lvl = this.weaponLevel;
         // Level 1: single center
         // Level 2: two parallel
@@ -197,7 +215,7 @@ class GameState {
         this.score += 500 * this.combo;
         this.hudFlash = { type: 'kill', time: Date.now() };
         // Drop a power-up at the enemy's position (50% chance)
-        if (enemyPos && Math.random() < 0.5) {
+        if (enemyPos && Math.random() < 0.5 && this.powerUpQueue.length < 10) {
             this.powerUpQueue.push({ x: enemyPos.x, y: enemyPos.y, z: enemyPos.z });
         }
         this.notify();
@@ -225,6 +243,7 @@ class GameState {
             this._invincibilityTimeout = null;
         }
         this.isInvincible = false;
+        this.paused = false;
         this.missilePositions.clear();
         this.enemyLaserQueue = [];
         this.enemyLaserPositions.clear();

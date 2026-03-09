@@ -4,19 +4,23 @@ import * as THREE from 'three';
 import { engine } from './AudioEngine';
 import { gameState } from './GameState';
 
-const TRAIL_LENGTH = 20;
+const TRAIL_LENGTH = 5;
+
+// Module-scope temp objects to avoid per-frame allocations
+const _tempVec = new THREE.Vector3();
+const _tempQuat = new THREE.Quaternion();
 
 export function Missiles() {
     const groupRef = useRef();
     const _target = new THREE.Vector3();
 
-    const MAX_COUNT = 30;
+    const MAX_COUNT = 20;
 
     const missileData = useMemo(() => {
         return Array.from({ length: MAX_COUNT }, (_, i) => {
-            const bodyGeo = new THREE.CylinderGeometry(0.35, 0.6, 4, 8);
-            const noseGeo = new THREE.SphereGeometry(0.55, 8, 8);
-            const orbitGeo = new THREE.SphereGeometry(0.25, 6, 6);
+            const bodyGeo = new THREE.CylinderGeometry(0.5, 0.8, 5, 8);
+            const noseGeo = new THREE.SphereGeometry(0.7, 8, 8);
+            const orbitGeo = new THREE.SphereGeometry(0.3, 6, 6);
 
             return {
                 id: i,
@@ -33,6 +37,7 @@ export function Missiles() {
                 trailIndex: 0,
                 trailTimer: 0,
                 nearMissChecked: false,
+                _collisionPos: new THREE.Vector3(),
             };
         });
     }, []);
@@ -69,6 +74,7 @@ export function Missiles() {
 
     useFrame((state, rawDelta) => {
         if (!groupRef.current) return;
+        if (gameState.paused) return;
         const delta = Math.min(rawDelta, 0.05);
 
         const time = state.clock.elapsedTime;
@@ -127,7 +133,8 @@ export function Missiles() {
             mesh.position.addScaledVector(data.velocity, delta);
 
             // Orient to face velocity
-            mesh.quaternion.setFromUnitVectors(_up, data.velocity.clone().normalize());
+            _tempVec.copy(data.velocity).normalize();
+            mesh.quaternion.setFromUnitVectors(_up, _tempVec);
 
             // === TWIRLING ORBIT LIGHTS ===
             const orbitA = mesh.children[3];
@@ -171,7 +178,8 @@ export function Missiles() {
                         const trailPos = data.trailPositions[idx];
 
                         trailDot.position.copy(trailPos).sub(mesh.position);
-                        trailDot.position.applyQuaternion(mesh.quaternion.clone().invert());
+                        _tempQuat.copy(mesh.quaternion).invert();
+                        trailDot.position.applyQuaternion(_tempQuat);
 
                         const age = t / TRAIL_LENGTH;
                         trailDot.scale.setScalar(Math.max((1 - age) * 0.6, 0.05));
@@ -183,7 +191,8 @@ export function Missiles() {
 
             // Collision reporting
             if (mesh.position.z > -80 && mesh.position.z < 15) {
-                gameState.updateMissilePosition(data.id, mesh.position.clone());
+                data._collisionPos.copy(mesh.position);
+                gameState.updateMissilePosition(data.id, data._collisionPos);
             } else {
                 gameState.missilePositions.delete(data.id);
             }
@@ -206,12 +215,12 @@ export function Missiles() {
                         <meshStandardMaterial color="#1a1400" emissive="#332200" emissiveIntensity={0.5} metalness={0.9} roughness={0.1} />
                     </mesh>
                     {/* [1] Glowing Nose / Warhead — bright yellow */}
-                    <mesh geometry={data.noseGeo} position={[0, 2, 0]}>
+                    <mesh geometry={data.noseGeo} position={[0, 2.5, 0]}>
                         <meshStandardMaterial color="#ffdd00" emissive="#ffaa00" emissiveIntensity={6} />
                     </mesh>
                     {/* [2] Engine Glow — orange fire */}
-                    <mesh position={[0, -2, 0]}>
-                        <cylinderGeometry args={[0.4, 0.15, 0.7, 8]} />
+                    <mesh position={[0, -2.5, 0]}>
+                        <cylinderGeometry args={[0.55, 0.2, 1.0, 8]} />
                         <meshStandardMaterial
                             color="#ff6600"
                             emissive="#ff4400"
@@ -244,7 +253,7 @@ export function Missiles() {
                     <group>
                         {Array.from({ length: TRAIL_LENGTH }, (_, t) => (
                             <mesh key={t}>
-                                <sphereGeometry args={[0.35, 4, 4]} />
+                                <sphereGeometry args={[0.45, 4, 4]} />
                                 <meshStandardMaterial
                                     color="#ffcc00"
                                     emissive="#ff8800"
@@ -256,8 +265,6 @@ export function Missiles() {
                             </mesh>
                         ))}
                     </group>
-                    {/* Self-illumination so missiles are visible from distance */}
-                    <pointLight color="#ffaa00" distance={15} intensity={2} />
                 </group>
             ))}
         </group>

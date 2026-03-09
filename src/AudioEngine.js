@@ -48,10 +48,12 @@ export class AudioEngine {
 
   // Called when the user clicks Initialize (file mode)
   init(audioElement) {
-    if (this.isInitialized) return;
+    if (this.isInitialized && !this.isCaptureMode) return;
 
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    this.audioContext = new AudioContext();
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
 
     this.audioElement = audioElement;
 
@@ -60,8 +62,11 @@ export class AudioEngine {
     this.analyser.fftSize = 1024;
     this.analyser.smoothingTimeConstant = 0.85;
 
-    this.source = this.audioContext.createMediaElementSource(this.audioElement);
-    this.source.connect(this.analyser);
+    // Only create MediaElementSource once per element — it persists across re-inits
+    if (!this._fileSource) {
+      this._fileSource = this.audioContext.createMediaElementSource(this.audioElement);
+    }
+    this._fileSource.connect(this.analyser);
     this.analyser.connect(this.audioContext.destination);
 
     const bufferLength = this.analyser.frequencyBinCount;
@@ -143,16 +148,23 @@ export class AudioEngine {
     this.capturePeak = 0.0;
 
     // Listen for the user stopping the share via browser UI
-    audioTracks[0].addEventListener('ended', () => {
+    this._captureEndedHandler = () => {
       this.stopCapture();
       if (this.onSongEnd && this.songPlaying) {
         this.songPlaying = false;
         this.onSongEnd();
       }
-    });
+    };
+    audioTracks[0].addEventListener('ended', this._captureEndedHandler);
+    this._captureTrack = audioTracks[0];
   }
 
   stopCapture() {
+    if (this._captureTrack && this._captureEndedHandler) {
+      this._captureTrack.removeEventListener('ended', this._captureEndedHandler);
+      this._captureTrack = null;
+      this._captureEndedHandler = null;
+    }
     if (this.captureStream) {
       this.captureStream.getTracks().forEach(t => t.stop());
       this.captureStream = null;
@@ -168,8 +180,6 @@ export class AudioEngine {
   async analyzeTrack(file) {
     if (!this.audioContext) return;
 
-    console.log("Starting Audio Analysis...");
-
     try {
       const arrayBuffer = await file.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
@@ -177,7 +187,6 @@ export class AudioEngine {
       // We will analyze the first channel (mono is fine for energy detection)
       const rawData = audioBuffer.getChannelData(0);
       const sampleRate = audioBuffer.sampleRate;
-      const totalDuration = audioBuffer.duration;
 
       const chunkSize = Math.floor(sampleRate * this.chunkDuration);
       const totalChunks = Math.floor(rawData.length / chunkSize);
@@ -208,10 +217,8 @@ export class AudioEngine {
         }
       }
 
-      console.log("Analysis Complete. Energy Map:", this.energyMap);
-
     } catch (e) {
-      console.error("Error decoding audio data:", e);
+      // Audio decode failed — energy map stays empty, game still works
     }
   }
 

@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { gameState } from './GameState';
 
-const MAX_POWERUPS = 6;
+const MAX_POWERUPS = 4;
 
 // Rainbow color cycle
 const RAINBOW = [
@@ -43,6 +43,7 @@ export function WeaponPowerUps() {
 
     useFrame((state, delta) => {
         if (!groupRef.current) return;
+        if (gameState.paused) return;
 
         const time = state.clock.elapsedTime;
         const children = groupRef.current.children;
@@ -93,7 +94,7 @@ export function WeaponPowerUps() {
             const rainbowT = time * 0.5 + i * 0.15;
             const col = getRainbow(rainbowT);
 
-            // Outer ring
+            // Outer ring [0]
             const ring = mesh.children[0];
             if (ring && ring.material) {
                 ring.material.color.copy(col);
@@ -101,7 +102,7 @@ export function WeaponPowerUps() {
                 ring.material.emissiveIntensity = 4 + Math.sin(time * 10 + data.spinPhase) * 2;
             }
 
-            // Inner core — offset rainbow
+            // Inner core [1] — offset rainbow
             const core = mesh.children[1];
             if (core && core.material) {
                 const col2 = getRainbow(rainbowT + 0.3);
@@ -110,20 +111,13 @@ export function WeaponPowerUps() {
                 core.material.emissiveIntensity = 6 + Math.sin(time * 12 + data.spinPhase) * 3;
             }
 
-            // Arrow
+            // Arrow [2]
             const arrow = mesh.children[2];
             if (arrow && arrow.material) {
                 const col3 = getRainbow(rainbowT + 0.6);
                 arrow.material.color.copy(col3);
                 arrow.material.emissive.copy(col3);
                 arrow.material.emissiveIntensity = 5;
-            }
-
-            // Point light color
-            const light = mesh.children[3];
-            if (light) {
-                light.color.copy(col);
-                light.intensity = 4 + Math.sin(time * 8) * 2;
             }
 
             // Pickup collision — generous radius
@@ -147,7 +141,7 @@ export function WeaponPowerUps() {
         <group ref={groupRef}>
             {Array.from({ length: MAX_POWERUPS }, (_, i) => (
                 <group key={i} visible={false}>
-                    {/* Outer ring */}
+                    {/* [0] Outer ring */}
                     <mesh>
                         <torusGeometry args={[2.0, 0.3, 8, 16]} />
                         <meshStandardMaterial
@@ -159,7 +153,7 @@ export function WeaponPowerUps() {
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    {/* Inner core — octahedron */}
+                    {/* [1] Inner core — octahedron */}
                     <mesh>
                         <octahedronGeometry args={[1.0, 0]} />
                         <meshStandardMaterial
@@ -168,7 +162,7 @@ export function WeaponPowerUps() {
                             emissiveIntensity={6}
                         />
                     </mesh>
-                    {/* Arrow indicator */}
+                    {/* [2] Arrow indicator */}
                     <mesh position={[0, 2.6, 0]}>
                         <coneGeometry args={[0.5, 1.0, 4]} />
                         <meshStandardMaterial
@@ -180,7 +174,6 @@ export function WeaponPowerUps() {
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    <pointLight color="#ffffff" distance={25} intensity={6} />
                 </group>
             ))}
         </group>
