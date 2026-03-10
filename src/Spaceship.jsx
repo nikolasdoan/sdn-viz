@@ -25,6 +25,10 @@ export function Spaceship() {
         ArrowDown: false,
         ArrowLeft: false,
         ArrowRight: false,
+        w: false,
+        a: false,
+        s: false,
+        d: false,
         ' ': false,
     });
 
@@ -167,10 +171,10 @@ export function Spaceship() {
         const friction = Math.pow(0.94, delta * 60); // frame-rate independent
         const maxSpeed = 45;
 
-        if (keys.current.ArrowLeft) velocity.current.x -= acceleration * delta;
-        if (keys.current.ArrowRight) velocity.current.x += acceleration * delta;
-        if (keys.current.ArrowUp) velocity.current.y += acceleration * delta;
-        if (keys.current.ArrowDown) velocity.current.y -= acceleration * delta;
+        if (keys.current.ArrowLeft || keys.current.a) velocity.current.x -= acceleration * delta;
+        if (keys.current.ArrowRight || keys.current.d) velocity.current.x += acceleration * delta;
+        if (keys.current.ArrowUp || keys.current.w) velocity.current.y += acceleration * delta;
+        if (keys.current.ArrowDown || keys.current.s) velocity.current.y -= acceleration * delta;
 
         velocity.current.x *= friction;
         velocity.current.y *= friction;

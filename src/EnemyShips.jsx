@@ -15,6 +15,7 @@ export function EnemyShips() {
     const flashTimers = useRef(new Array(MAX_ENEMIES).fill(0));
     const fireCooldowns = useRef(new Array(MAX_ENEMIES).fill(0));
     const laserCooldowns = useRef(new Array(MAX_ENEMIES).fill(0));
+    const mineCooldowns = useRef(new Array(MAX_ENEMIES).fill(0));
 
     const enemyData = useMemo(() => {
         return Array.from({ length: MAX_ENEMIES }, (_, i) => ({
@@ -75,15 +76,17 @@ export function EnemyShips() {
 
         mesh.position.set(spreadX, spreadY, spawnZ);
         data.active = true;
-        data.maxHealth = 5 + Math.floor((gameState.wave - 1) * 1.5);
+        const ehMult = gameState.getEnemyHealthMultiplier();
+        data.maxHealth = Math.floor((5 + Math.floor((gameState.wave - 1) * 1.5)) * ehMult);
         data.health = data.maxHealth;
-        data.maxShieldHealth = 3 + Math.floor((gameState.wave - 1));
+        data.maxShieldHealth = Math.floor((3 + Math.floor((gameState.wave - 1))) * ehMult);
         data.shieldHealth = data.maxShieldHealth;
         data.speed = ENEMY_SPEED + Math.random() * 10 + (gameState.wave - 1) * 2;
         data.strafePhase = Math.random() * Math.PI * 2;
         flashTimers.current[data.id] = 0;
         fireCooldowns.current[data.id] = 1.0;
         laserCooldowns.current[data.id] = 2.0;
+        mineCooldowns.current[data.id] = 3.0 + Math.random() * 2;
     };
 
     useFrame((state, rawDelta) => {
@@ -148,7 +151,7 @@ export function EnemyShips() {
             const waveFactor = Math.min(gameState.wave * 0.15, 0.6); // up to 60% faster
             if (isBeat && fireCooldowns.current[i] <= 0 && mesh.position.z < 0) {
                 // Fire more missiles at higher waves
-                const shotsPerVolley = Math.min(1 + Math.floor((gameState.wave - 1) / 2), 3);
+                const shotsPerVolley = Math.min(Math.ceil((1 + Math.floor((gameState.wave - 1) / 2)) * gameState.difficultyPreset.missileCountMult), 5);
                 for (let s = 0; s < shotsPerVolley; s++) {
                     gameState.missileSpawnQueue.push({
                         x: mesh.position.x + (s - (shotsPerVolley - 1) / 2) * 2,
@@ -157,15 +160,15 @@ export function EnemyShips() {
                     });
                 }
 
-                const baseCooldown = edmState === 'drop' ? 0.3 : edmState === 'buildup' ? 0.5 : 0.8;
-                fireCooldowns.current[i] = baseCooldown * (1 - waveFactor);
+                const baseCooldown = edmState === 'drop' ? 0.6 : edmState === 'buildup' ? 1.0 : 1.5;
+                fireCooldowns.current[i] = baseCooldown * (1 - waveFactor) / gameState.getFireRateMultiplier();
                 flashTimers.current[i] = 0.08;
             }
 
             // === FIRE LASER BOLTS (between missile volleys) ===
             laserCooldowns.current[i] -= delta;
-            const laserRate = edmState === 'drop' ? 0.2 : edmState === 'buildup' ? 0.4 : 0.6;
-            const laserCooldown = laserRate * (1 - waveFactor * 0.5);
+            const laserRate = edmState === 'drop' ? 0.5 : edmState === 'buildup' ? 0.8 : 1.2;
+            const laserCooldown = laserRate * (1 - waveFactor * 0.5) / gameState.getFireRateMultiplier();
             if (laserCooldowns.current[i] <= 0 && mesh.position.z < -5) {
                 const shipPos = gameState.shipPosition;
                 gameState.enemyLaserQueue.push({
@@ -177,6 +180,17 @@ export function EnemyShips() {
                     tz: shipPos.z,
                 });
                 laserCooldowns.current[i] = laserCooldown;
+            }
+
+            // === DROP SPACE MINES ===
+            mineCooldowns.current[i] -= delta;
+            if (mineCooldowns.current[i] <= 0 && mesh.position.z < -10) {
+                gameState.mineSpawnQueue.push({
+                    x: mesh.position.x + (Math.random() - 0.5) * 10,
+                    y: mesh.position.y + (Math.random() - 0.5) * 5,
+                    z: mesh.position.z + 5,
+                });
+                mineCooldowns.current[i] = 4 + Math.random() * 4;
             }
 
             // === VISUAL UPDATES ===
@@ -209,8 +223,8 @@ export function EnemyShips() {
             if (neonTop && neonTop.material) neonTop.material.emissiveIntensity = neonPulse;
             if (neonBot && neonBot.material) neonBot.material.emissiveIntensity = neonPulse;
 
-            // === SHIELD BUBBLE [9] — throbs and pulses with music ===
-            const shield = mesh.children[9];
+            // === SHIELD BUBBLE [19] — throbs and pulses with music ===
+            const shield = mesh.children[19];
             if (shield) {
                 if (data.shieldHealth > 0) {
                     shield.visible = true;
@@ -236,8 +250,8 @@ export function EnemyShips() {
                 }
             }
 
-            // === HEALTH BAR [10] — billboard group ===
-            const hpBarGroup = mesh.children[10];
+            // === HEALTH BAR [20] — billboard group ===
+            const hpBarGroup = mesh.children[20];
             if (hpBarGroup) {
                 // Billboard: face camera
                 hpBarGroup.lookAt(camera.position);
@@ -282,88 +296,111 @@ export function EnemyShips() {
         <group ref={groupRef}>
             {Array.from({ length: MAX_ENEMIES }, (_, i) => (
                 <group key={i} visible={false} scale={[5, 5, 5]}>
-                    {/* [0] Hull — main body */}
+                    {/* [0] Hull — same shape as player, dark red */}
                     <mesh>
-                        <boxGeometry args={[1.8, 0.4, 3]} />
+                        <boxGeometry args={[1.2, 0.4, 2]} />
                         <meshStandardMaterial
-                            color="#331111"
-                            emissive="#ff2200"
+                            color="#1a0000"
+                            emissive="#ff1100"
                             emissiveIntensity={0.5}
-                            metalness={0.9}
-                            roughness={0.2}
-                        />
-                    </mesh>
-                    {/* [1] Left wing */}
-                    <mesh position={[-1.8, 0, 0.3]} rotation={[0, 0, 0.12]}>
-                        <boxGeometry args={[2, 0.1, 1]} />
-                        <meshStandardMaterial color="#220000" metalness={0.9} roughness={0.3} />
-                    </mesh>
-                    {/* [2] Right wing */}
-                    <mesh position={[1.8, 0, 0.3]} rotation={[0, 0, -0.12]}>
-                        <boxGeometry args={[2, 0.1, 1]} />
-                        <meshStandardMaterial color="#220000" metalness={0.9} roughness={0.3} />
-                    </mesh>
-                    {/* [3] Cockpit dome */}
-                    <mesh position={[0, 0.3, -0.8]}>
-                        <sphereGeometry args={[0.4, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
-                        <meshStandardMaterial
-                            color="#440000"
-                            emissive="#ff0000"
-                            emissiveIntensity={1}
-                            metalness={0.7}
-                            roughness={0.3}
-                        />
-                    </mesh>
-                    {/* [4] Weapon turret */}
-                    <mesh position={[0, -0.25, -1.2]}>
-                        <cylinderGeometry args={[0.15, 0.15, 0.8, 6]} />
-                        <meshStandardMaterial
-                            color="#550000"
-                            emissive="#ff4400"
-                            emissiveIntensity={1.5}
                             metalness={0.8}
                             roughness={0.2}
                         />
                     </mesh>
-                    {/* [5] Left engine */}
-                    <mesh position={[-0.6, 0, 1.5]}>
-                        <cylinderGeometry args={[0.2, 0.08, 0.6, 8]} />
+                    {/* [1] Left wing */}
+                    <mesh position={[-1.4, -0.05, 0.2]} rotation={[0, 0, -0.1]}>
+                        <boxGeometry args={[2, 0.1, 1]} />
+                        <meshStandardMaterial color="#220000" metalness={0.8} roughness={0.2} emissive="#330000" emissiveIntensity={0.3} />
+                    </mesh>
+                    {/* [2] Right wing */}
+                    <mesh position={[1.4, -0.05, 0.2]} rotation={[0, 0, 0.1]}>
+                        <boxGeometry args={[2, 0.1, 1]} />
+                        <meshStandardMaterial color="#220000" metalness={0.8} roughness={0.2} emissive="#330000" emissiveIntensity={0.3} />
+                    </mesh>
+                    {/* [3] Cockpit — red evil slit */}
+                    <mesh position={[0, 0.25, -0.4]}>
+                        <boxGeometry args={[0.8, 0.2, 0.6]} />
                         <meshStandardMaterial
-                            color="#ff4400"
-                            emissive="#ff2200"
+                            color="#ff0000"
+                            emissive="#ff0000"
                             emissiveIntensity={3}
-                            transparent opacity={0.8}
-                            blending={THREE.AdditiveBlending}
+                            metalness={0.9}
+                            roughness={0.05}
                         />
                     </mesh>
-                    {/* [6] Right engine */}
-                    <mesh position={[0.6, 0, 1.5]}>
-                        <cylinderGeometry args={[0.2, 0.08, 0.6, 8]} />
-                        <meshStandardMaterial
-                            color="#ff4400"
-                            emissive="#ff2200"
-                            emissiveIntensity={3}
-                            transparent opacity={0.8}
-                            blending={THREE.AdditiveBlending}
-                        />
+                    {/* [4] Left fin */}
+                    <mesh position={[-2.4, 0.2, 0.5]}>
+                        <boxGeometry args={[0.1, 0.6, 0.8]} />
+                        <meshStandardMaterial color="#330000" metalness={0.8} roughness={0.2} />
                     </mesh>
-                    {/* [7] Top neon strip */}
-                    <mesh position={[0, 0.22, 0]}>
-                        <boxGeometry args={[1.9, 0.05, 0.05]} />
-                        <meshStandardMaterial
-                            color="#ff0000" emissive="#ff0000" emissiveIntensity={2}
-                            blending={THREE.AdditiveBlending} transparent opacity={0.9}
-                        />
+                    {/* [5] Left engine nacelle */}
+                    <mesh position={[-0.4, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+                        <cylinderGeometry args={[0.3, 0.28, 1.2, 12]} />
+                        <meshStandardMaterial color="#1a0000" metalness={0.9} roughness={0.2} emissive="#ff2200" emissiveIntensity={0.3} />
                     </mesh>
-                    {/* [8] Bottom neon strip */}
+                    {/* [6] Right engine nacelle */}
+                    <mesh position={[0.4, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+                        <cylinderGeometry args={[0.3, 0.28, 1.2, 12]} />
+                        <meshStandardMaterial color="#1a0000" metalness={0.9} roughness={0.2} emissive="#ff2200" emissiveIntensity={0.3} />
+                    </mesh>
+                    {/* [7] Neon nose edge — red */}
+                    <mesh position={[0, 0.22, -1.0]}>
+                        <boxGeometry args={[1.3, 0.06, 0.06]} />
+                        <meshStandardMaterial color="#ff2200" emissive="#ff2200" emissiveIntensity={4} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    {/* [8] Neon underglow — red */}
                     <mesh position={[0, -0.22, 0]}>
-                        <boxGeometry args={[1.9, 0.05, 0.05]} />
-                        <meshStandardMaterial
-                            color="#ff4400" emissive="#ff4400" emissiveIntensity={2}
-                            blending={THREE.AdditiveBlending} transparent opacity={0.9}
-                        />
+                        <boxGeometry args={[1.2, 0.04, 2.0]} />
+                        <meshStandardMaterial color="#ff4400" emissive="#ff4400" emissiveIntensity={3} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
                     </mesh>
-                    {/* [9] Shield bubble — gold */}
+                    {/* Right fin */}
+                    <mesh position={[2.4, 0.2, 0.5]}>
+                        <boxGeometry args={[0.1, 0.6, 0.8]} />
+                        <meshStandardMaterial color="#330000" metalness={0.8} roughness={0.2} />
+                    </mesh>
+                    {/* Left engine nozzle ring — red */}
+                    <mesh position={[-0.4, 0, 1.12]} rotation={[Math.PI / 2, 0, 0]}>
+                        <torusGeometry args={[0.28, 0.04, 8, 16]} />
+                        <meshStandardMaterial color="#ff2200" emissive="#ff2200" emissiveIntensity={4} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    {/* Right engine nozzle ring — red */}
+                    <mesh position={[0.4, 0, 1.12]} rotation={[Math.PI / 2, 0, 0]}>
+                        <torusGeometry args={[0.28, 0.04, 8, 16]} />
+                        <meshStandardMaterial color="#ff2200" emissive="#ff2200" emissiveIntensity={4} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    {/* Wing neon edges — red */}
+                    <mesh position={[-1.4, -0.05, -0.3]}>
+                        <boxGeometry args={[2.05, 0.06, 0.06]} />
+                        <meshStandardMaterial color="#ff2200" emissive="#ff2200" emissiveIntensity={3} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    <mesh position={[1.4, -0.05, -0.3]}>
+                        <boxGeometry args={[2.05, 0.06, 0.06]} />
+                        <meshStandardMaterial color="#ff2200" emissive="#ff2200" emissiveIntensity={3} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    {/* Wing tip glows — orange */}
+                    <mesh position={[-2.4, 0.0, -0.3]}>
+                        <boxGeometry args={[0.18, 0.1, 0.18]} />
+                        <meshStandardMaterial color="#ff4400" emissive="#ff4400" emissiveIntensity={5} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    <mesh position={[2.4, 0.0, -0.3]}>
+                        <boxGeometry args={[0.18, 0.1, 0.18]} />
+                        <meshStandardMaterial color="#ff4400" emissive="#ff4400" emissiveIntensity={5} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    {/* Fin top edges — orange neon */}
+                    <mesh position={[-2.4, 0.5, 0.5]}>
+                        <boxGeometry args={[0.12, 0.06, 0.8]} />
+                        <meshStandardMaterial color="#ff4400" emissive="#ff4400" emissiveIntensity={3} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    <mesh position={[2.4, 0.5, 0.5]}>
+                        <boxGeometry args={[0.12, 0.06, 0.8]} />
+                        <meshStandardMaterial color="#ff4400" emissive="#ff4400" emissiveIntensity={3} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    {/* Nose tip accent — red */}
+                    <mesh position={[0, 0.1, -1.05]}>
+                        <boxGeometry args={[0.3, 0.15, 0.1]} />
+                        <meshStandardMaterial color="#ff2200" emissive="#ff2200" emissiveIntensity={5} transparent opacity={0.9} blending={THREE.AdditiveBlending} />
+                    </mesh>
+                    {/* [19] Shield bubble — gold wireframe */}
                     <mesh>
                         <icosahedronGeometry args={[3.5, 1]} />
                         <meshStandardMaterial
@@ -377,7 +414,7 @@ export function EnemyShips() {
                             wireframe
                         />
                     </mesh>
-                    {/* [10] Health bar group (billboard) */}
+                    {/* [20] Health bar group (billboard) */}
                     <group position={[0, 2.2, 0]}>
                         {/* Hull HP bar (red→green) */}
                         <mesh position={[0, 0, 0]}>

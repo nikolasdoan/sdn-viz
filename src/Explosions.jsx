@@ -4,13 +4,17 @@ import * as THREE from 'three';
 import { gameState } from './GameState';
 
 const MAX_EXPLOSIONS = 8;
-const PARTICLES_PER = 20;
+const PARTICLES_PER = 12;
 const TOTAL_PARTICLES = MAX_EXPLOSIONS * PARTICLES_PER;
 
 // Shield hit bursts — smaller, faster, gold
 const MAX_SHIELD_HITS = 10;
-const SHIELD_PARTICLES_PER = 8;
+const SHIELD_PARTICLES_PER = 5;
 const TOTAL_SHIELD_PARTICLES = MAX_SHIELD_HITS * SHIELD_PARTICLES_PER;
+
+// Shared geometries
+const _explosionGeo = new THREE.IcosahedronGeometry(0.8, 0);
+const _shieldHitGeo = new THREE.IcosahedronGeometry(0.5, 0);
 
 // Color palettes
 const ENEMY_COLORS = [
@@ -286,8 +290,7 @@ export function Explosions() {
             {/* Death/hit explosion particles */}
             <group ref={groupRef}>
                 {Array.from({ length: TOTAL_PARTICLES }, (_, i) => (
-                    <mesh key={i} visible={false}>
-                        <icosahedronGeometry args={[0.8, 0]} />
+                    <mesh key={i} visible={false} geometry={_explosionGeo}>
                         <meshStandardMaterial
                             color="#ffffff"
                             emissive="#ffffff"
@@ -304,8 +307,7 @@ export function Explosions() {
             {/* Shield hit burst particles */}
             <group ref={shieldGroupRef}>
                 {Array.from({ length: TOTAL_SHIELD_PARTICLES }, (_, i) => (
-                    <mesh key={i} visible={false}>
-                        <icosahedronGeometry args={[0.5, 0]} />
+                    <mesh key={i} visible={false} geometry={_shieldHitGeo}>
                         <meshStandardMaterial
                             color="#ffcc00"
                             emissive="#ff8800"

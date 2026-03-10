@@ -4,7 +4,13 @@ import * as THREE from 'three';
 import { engine } from './AudioEngine';
 import { gameState } from './GameState';
 
-const TRAIL_LENGTH = 5;
+const TRAIL_LENGTH = 8;
+
+// Shared geometries — Y2K retro-future star
+const _starPointGeo = new THREE.SphereGeometry(1, 8, 8); // stretched into elongated diamond points
+// center orb removed
+// orbital ring removed
+const _trailGeo = new THREE.SphereGeometry(0.3, 4, 4);
 
 // Module-scope temp objects to avoid per-frame allocations
 const _tempVec = new THREE.Vector3();
@@ -17,29 +23,20 @@ export function Missiles() {
     const MAX_COUNT = 20;
 
     const missileData = useMemo(() => {
-        return Array.from({ length: MAX_COUNT }, (_, i) => {
-            const bodyGeo = new THREE.CylinderGeometry(0.5, 0.8, 5, 8);
-            const noseGeo = new THREE.SphereGeometry(0.7, 8, 8);
-            const orbitGeo = new THREE.SphereGeometry(0.3, 6, 6);
-
-            return {
-                id: i,
-                active: false,
-                velocity: new THREE.Vector3(0, 0, 70),
-                baseSpeed: 60 + Math.random() * 40,
-                baseTurnSpeed: 0.02 + Math.random() * 0.03,
-                life: 0,
-                orbitPhase: Math.random() * Math.PI * 2,
-                bodyGeo,
-                noseGeo,
-                orbitGeo,
-                trailPositions: Array.from({ length: TRAIL_LENGTH }, () => new THREE.Vector3(0, 0, -9999)),
-                trailIndex: 0,
-                trailTimer: 0,
-                nearMissChecked: false,
-                _collisionPos: new THREE.Vector3(),
-            };
-        });
+        return Array.from({ length: MAX_COUNT }, (_, i) => ({
+            id: i,
+            active: false,
+            velocity: new THREE.Vector3(0, 0, 70),
+            baseSpeed: 60 + Math.random() * 40,
+            baseTurnSpeed: 0.02 + Math.random() * 0.03,
+            life: 0,
+            orbitPhase: Math.random() * Math.PI * 2,
+            trailPositions: Array.from({ length: TRAIL_LENGTH }, () => new THREE.Vector3(0, 0, -9999)),
+            trailIndex: 0,
+            trailTimer: 0,
+            nearMissChecked: false,
+            _collisionPos: new THREE.Vector3(),
+        }));
     }, []);
 
     const _dir = new THREE.Vector3();
@@ -136,40 +133,23 @@ export function Missiles() {
             _tempVec.copy(data.velocity).normalize();
             mesh.quaternion.setFromUnitVectors(_up, _tempVec);
 
-            // === TWIRLING ORBIT LIGHTS ===
-            const orbitA = mesh.children[3];
-            const orbitB = mesh.children[4];
-            if (orbitA && orbitB) {
-                const orbitRadius = 1.2;
-                const phase = time * 8 + data.orbitPhase;
-
-                orbitA.position.set(
-                    Math.cos(phase) * orbitRadius,
-                    Math.sin(phase * 0.7) * 0.5,
-                    Math.sin(phase) * orbitRadius
-                );
-                orbitB.position.set(
-                    Math.cos(phase + Math.PI) * orbitRadius,
-                    Math.sin((phase + Math.PI) * 0.7) * 0.5,
-                    Math.sin(phase + Math.PI) * orbitRadius
-                );
-
-                // Pulse brighter on beats
-                const beatBoost = engine.isBeat ? 4 : 0;
-                const pulse = 3.0 + Math.sin(time * 15 + data.orbitPhase) * 2.0 + beatBoost;
-                orbitA.material.emissiveIntensity = pulse;
-                orbitB.material.emissiveIntensity = pulse;
-            }
+            // === STAR SPIN + PULSE ===
+            // [0] vertical star point, [1] horizontal star point — spin around velocity axis
+            const starV = mesh.children[0];
+            const starH = mesh.children[1];
+            const starSpin = time * 4 + data.orbitPhase;
+            if (starV) starV.rotation.y = starSpin;
+            if (starH) starH.rotation.y = starSpin;
 
             // === TRAIL UPDATE ===
             data.trailTimer += delta;
-            if (data.trailTimer > 0.03) {
+            if (data.trailTimer > 0.025) {
                 data.trailTimer = 0;
                 data.trailPositions[data.trailIndex].copy(mesh.position);
                 data.trailIndex = (data.trailIndex + 1) % TRAIL_LENGTH;
             }
 
-            const trailGroup = mesh.children[5];
+            const trailGroup = mesh.children[2];
             if (trailGroup) {
                 for (let t = 0; t < TRAIL_LENGTH; t++) {
                     const trailDot = trailGroup.children[t];
@@ -182,8 +162,8 @@ export function Missiles() {
                         trailDot.position.applyQuaternion(_tempQuat);
 
                         const age = t / TRAIL_LENGTH;
-                        trailDot.scale.setScalar(Math.max((1 - age) * 0.6, 0.05));
-                        trailDot.material.opacity = (1 - age) * 0.8;
+                        trailDot.scale.setScalar(Math.max((1 - age) * 0.7, 0.05));
+                        trailDot.material.opacity = (1 - age) * 0.85;
                         trailDot.visible = trailPos.z > -9000;
                     }
                 }
@@ -197,11 +177,14 @@ export function Missiles() {
                 gameState.missilePositions.delete(data.id);
             }
 
-            // Warhead pulse — brighter on beats
-            const warhead = mesh.children[1];
-            if (warhead && warhead.material) {
-                const beatPulse = engine.isBeat ? 5 : 0;
-                warhead.material.emissiveIntensity = 3.0 + Math.sin(time * 12) * 2.0 + beatPulse;
+            // Star point pulse — brighter on beats
+            if (starV && starV.material) {
+                const beatPulse = engine.isBeat ? 3 : 0;
+                starV.material.emissiveIntensity = 4 + Math.sin(time * 10) * 2 + beatPulse;
+            }
+            if (starH && starH.material) {
+                const beatPulse = engine.isBeat ? 3 : 0;
+                starH.material.emissiveIntensity = 4 + Math.sin(time * 10 + 1) * 2 + beatPulse;
             }
         }
     });
@@ -210,55 +193,35 @@ export function Missiles() {
         <group ref={groupRef}>
             {missileData.map((data, i) => (
                 <group key={i} visible={false}>
-                    {/* [0] Body — dark with gold tint */}
-                    <mesh geometry={data.bodyGeo}>
-                        <meshStandardMaterial color="#1a1400" emissive="#332200" emissiveIntensity={0.5} metalness={0.9} roughness={0.1} />
-                    </mesh>
-                    {/* [1] Glowing Nose / Warhead — bright yellow */}
-                    <mesh geometry={data.noseGeo} position={[0, 2.5, 0]}>
-                        <meshStandardMaterial color="#ffdd00" emissive="#ffaa00" emissiveIntensity={6} />
-                    </mesh>
-                    {/* [2] Engine Glow — orange fire */}
-                    <mesh position={[0, -2.5, 0]}>
-                        <cylinderGeometry args={[0.55, 0.2, 1.0, 8]} />
+                    {/* [0] Vertical star point — stretched sphere */}
+                    <mesh geometry={_starPointGeo} scale={[0.25, 2.2, 0.25]}>
                         <meshStandardMaterial
-                            color="#ff6600"
-                            emissive="#ff4400"
-                            emissiveIntensity={8}
+                            color="#ffcc00"
+                            emissive="#ffaa00"
+                            emissiveIntensity={5}
                             transparent opacity={0.9}
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    {/* [3] Orbit Light A — bright yellow */}
-                    <mesh geometry={data.orbitGeo}>
+                    {/* [1] Horizontal star point — stretched sphere, perpendicular */}
+                    <mesh geometry={_starPointGeo} scale={[2.2, 0.25, 0.25]}>
                         <meshStandardMaterial
-                            color="#ffee00"
-                            emissive="#ffdd00"
-                            emissiveIntensity={6}
+                            color="#ffcc00"
+                            emissive="#ffaa00"
+                            emissiveIntensity={5}
                             transparent opacity={0.9}
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    {/* [4] Orbit Light B — warm orange */}
-                    <mesh geometry={data.orbitGeo}>
-                        <meshStandardMaterial
-                            color="#ffaa00"
-                            emissive="#ff8800"
-                            emissiveIntensity={6}
-                            transparent opacity={0.9}
-                            blending={THREE.AdditiveBlending}
-                        />
-                    </mesh>
-                    {/* [5] Trail group — golden exhaust */}
+                    {/* [2] Trail group — glowing star trail */}
                     <group>
                         {Array.from({ length: TRAIL_LENGTH }, (_, t) => (
-                            <mesh key={t}>
-                                <sphereGeometry args={[0.45, 4, 4]} />
+                            <mesh key={t} geometry={_trailGeo}>
                                 <meshStandardMaterial
-                                    color="#ffcc00"
-                                    emissive="#ff8800"
-                                    emissiveIntensity={5}
-                                    transparent opacity={0.7}
+                                    color="#ffdd00"
+                                    emissive="#ffaa00"
+                                    emissiveIntensity={6}
+                                    transparent opacity={0.8}
                                     blending={THREE.AdditiveBlending}
                                     depthWrite={false}
                                 />

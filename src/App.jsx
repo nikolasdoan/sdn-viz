@@ -40,6 +40,12 @@ function App() {
   const audioRef = useRef(null);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [difficulty, setDifficultyState] = useState(gameState.difficulty);
+
+  const handleDifficulty = (level) => {
+    gameState.setDifficulty(level);
+    setDifficultyState(level);
+  };
 
   // Capture mode state
   const [isCapturing, setIsCapturing] = useState(false);
@@ -390,8 +396,8 @@ function App() {
         <header className="header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h1 className="title">SOUND_VOYAGE.JS</h1>
-              <p className="subtitle"><a href="https://www.tecxmate.com" target="_blank" rel="noopener noreferrer" className="tecxmate-link"></a></p>
+              <h1 className="title">SOUND VOYAGE</h1>
+              <p className="subtitle"><a href="https://www.tecxmate.com" target="_blank" rel="noopener noreferrer" className="tecxmate-link">TECXMATE.COM</a></p>
             </div>
 
             {/* Score + Combo + Health */}
@@ -409,9 +415,14 @@ function App() {
                     </span>
                   ))}
                 </div>
-                <div className="item-legend">
-                  <span className="legend-item"><span className="legend-icon repair">◆</span> REPAIR</span>
-                  <span className="legend-item"><span className="legend-icon powerup">◎</span> POWER UP</span>
+                <div className="controls-hint">
+                  <span>WASD / ARROWS — Move</span>
+                  <span>SPACE — Fire</span>
+                </div>
+                <div className="controls-hint">
+                  <span><span className="legend-icon repair">◆</span> REPAIR</span>
+                  <span><span className="legend-icon powerup">◎</span> POWER UP</span>
+                  <span><span className="legend-icon missile">⦿</span> MISSILE</span>
                 </div>
               </div>
             )}
@@ -449,6 +460,9 @@ function App() {
           </div>
         ) : (
           <div className="control-panel glass-panel">
+            {!hasStarted && !isAnalyzing && !isCapturing && (
+              <p className="subtitle" style={{ textAlign: "center" }}>PLEASE LOAD AN AUDIO FILE OR CAPTURE SYSTEM AUDIO TO BEGIN.</p>
+            )}
             <div className="input-section">
               <div className="section-label">FILE MODE</div>
               <div className="section-row">
@@ -497,21 +511,39 @@ function App() {
 
             <span className="file-name">{fileName}</span>
 
+            {!hasStarted && !isAnalyzing && !isCapturing && (
+              <div className="difficulty-section">
+                <div className="section-label">DIFFICULTY</div>
+                <div className="difficulty-buttons">
+                  {['easy', 'normal', 'hard', 'extreme'].map((level) => (
+                    <button
+                      key={level}
+                      className={`cyber-button difficulty-btn ${difficulty === level ? 'active' : ''} difficulty-${level}`}
+                      onClick={() => handleDifficulty(level)}
+                    >
+                      {level.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {isCapturing && captureStatus === 'listening' && (
               <p className="subtitle capture-listening" style={{ textAlign: "center" }}>Listening for audio... Play a song to begin.</p>
             )}
 
-            {!hasStarted && !isAnalyzing && !isCapturing && (
-              <p className="subtitle" style={{ textAlign: "center" }}>Please load an audio file or capture system audio to begin.</p>
-            )}
+
           </div>
         )}
-        {hasStarted && (
-          <div className="controls-hint">
-            <div>ARROW KEYS — Move</div>
-            <div>SPACE — Fire</div>
-          </div>
-        )}
+        </div>
+
+      <div className="support-corner">
+        <a href="https://buy.stripe.com/5kQ9ATgIffS8fGCc7L0oM02" target="_blank" rel="noopener noreferrer" className="cyber-button support-btn">
+          [ SUPPORT THIS PROJECT ]
+        </a>
+        <a href="https://github.com/nikolasdoan/sdn-viz" target="_blank" rel="noopener noreferrer" className="cyber-button contribute-btn">
+          [ CONTRIBUTE ]
+        </a>
       </div>
     </div>
   );

@@ -1,9 +1,20 @@
 import * as THREE from 'three';
 
+const DIFFICULTY_PRESETS = {
+    easy:    { health: 7, enemyHealthMult: 0.7, fireRateMult: 0.6, missileCountMult: 0.5, missileSpeedMult: 0.8, homingMult: 0.6 },
+    normal:  { health: 5, enemyHealthMult: 1.0, fireRateMult: 1.0, missileCountMult: 1.0, missileSpeedMult: 1.0, homingMult: 1.0 },
+    hard:    { health: 4, enemyHealthMult: 1.3, fireRateMult: 1.5, missileCountMult: 1.5, missileSpeedMult: 1.3, homingMult: 1.5 },
+    extreme: { health: 3, enemyHealthMult: 1.8, fireRateMult: 2.0, missileCountMult: 2.0, missileSpeedMult: 1.6, homingMult: 2.0 },
+};
+
 class GameState {
     constructor() {
-        this.maxHealth = 5;
-        this.health = 5;
+        // Difficulty
+        this.difficulty = localStorage.getItem('soundVoyage_difficulty') || 'normal';
+        this.difficultyPreset = DIFFICULTY_PRESETS[this.difficulty];
+
+        this.maxHealth = this.difficultyPreset.health;
+        this.health = this.maxHealth;
         this.score = 0;
         this.listeners = new Set();
         this.isInvincible = false;
@@ -40,6 +51,10 @@ class GameState {
         // Enemy laser spawn queue — enemies fire laser bolts, EnemyLasers component consumes
         this.enemyLaserQueue = []; // { x, y, z, tx, ty, tz } — position + target
         this.enemyLaserPositions = new Map(); // id -> Vector3 (for collision with player)
+
+        // Space mines — enemies drop these, they drift toward player
+        this.mineSpawnQueue = []; // { x, y, z }
+        this.minePositions = new Map(); // id -> Vector3
 
         // Weapon power-up system (Chicken Invader style)
         this.weaponLevel = 1; // 1-5
@@ -222,6 +237,7 @@ class GameState {
     }
 
     reset() {
+        this.maxHealth = this.difficultyPreset.health;
         this.health = this.maxHealth;
         this.score = 0;
         this.combo = 1;
@@ -236,6 +252,8 @@ class GameState {
         this.bulletPositions.clear();
         this.enemyPositions.clear();
         this.missileSpawnQueue = [];
+        this.mineSpawnQueue = [];
+        this.minePositions.clear();
         this.powerUpQueue = [];
 
         if (this._invincibilityTimeout) {
@@ -266,16 +284,39 @@ class GameState {
         this.shipPosition.copy(position);
     }
 
+    setDifficulty(level) {
+        if (!DIFFICULTY_PRESETS[level]) return;
+        this.difficulty = level;
+        this.difficultyPreset = DIFFICULTY_PRESETS[level];
+        try { localStorage.setItem('soundVoyage_difficulty', level); } catch (e) { /* quota */ }
+    }
+
     getWaveMissileCount() {
-        return Math.floor(5 + (this.wave - 1) * 3);
+        return Math.floor((5 + (this.wave - 1) * 3) * this.difficultyPreset.missileCountMult);
     }
 
     getWaveSpeedMultiplier() {
-        return 1 + (this.wave - 1) * 0.15;
+        return (1 + (this.wave - 1) * 0.15) * this.difficultyPreset.missileSpeedMult;
     }
 
     getWaveHomingMultiplier() {
-        return 1 + (this.wave - 1) * 0.2;
+        return (1 + (this.wave - 1) * 0.2) * this.difficultyPreset.homingMult;
+    }
+
+    getFireRateMultiplier() {
+        return this.difficultyPreset.fireRateMult;
+    }
+
+    getEnemyHealthMultiplier() {
+        return this.difficultyPreset.enemyHealthMult;
+    }
+
+    updateMinePosition(id, position) {
+        this.minePositions.set(id, position);
+    }
+
+    removeMine(id) {
+        this.minePositions.delete(id);
     }
 }
 

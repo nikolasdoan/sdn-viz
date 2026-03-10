@@ -5,7 +5,11 @@ import { gameState } from './GameState';
 
 const MAX_LASERS = 30;
 const LASER_SPEED = 180;
-const WAVE_SEGMENTS = 20;
+
+// Shared geometries — star-comet shape
+const _starPointGeo = new THREE.SphereGeometry(1, 8, 8); // stretched into 4-point star
+const _tailGeo = new THREE.ConeGeometry(0.6, 8, 6); // long tapered tail
+const _tailGlowGeo = new THREE.ConeGeometry(1.0, 6, 6); // outer glow tail
 
 const _dir = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
@@ -22,15 +26,6 @@ export function EnemyLasers() {
             _collisionPos: new THREE.Vector3(),
             wigglePhase: Math.random() * Math.PI * 2,
         }));
-    }, []);
-
-    // Pre-build shared buffer geometry for the wave trail
-    const waveGeo = useMemo(() => {
-        const points = [];
-        for (let s = 0; s < WAVE_SEGMENTS; s++) {
-            points.push(new THREE.Vector3(0, 0, 0));
-        }
-        return new THREE.BufferGeometry().setFromPoints(points);
     }, []);
 
     useFrame((state, rawDelta) => {
@@ -85,25 +80,17 @@ export function EnemyLasers() {
                 continue;
             }
 
-            // Pulsing glow on core [0]
-            const core = mesh.children[0];
-            if (core && core.material) {
-                core.material.emissiveIntensity = 8 + Math.sin(time * 40 + i) * 4;
-            }
+            // Star point pulse [0],[1]
+            const starV = mesh.children[0];
+            const starH = mesh.children[1];
+            const pulse = 6 + Math.sin(time * 30 + i) * 3;
+            if (starV && starV.material) starV.material.emissiveIntensity = pulse;
+            if (starH && starH.material) starH.material.emissiveIntensity = pulse;
 
-            // Wiggling wave trail [2] — update vertex positions
-            const waveLine = mesh.children[2];
-            if (waveLine && waveLine.geometry) {
-                const posAttr = waveLine.geometry.attributes.position;
-                for (let s = 0; s < WAVE_SEGMENTS; s++) {
-                    const t = s / (WAVE_SEGMENTS - 1);
-                    const yPos = -3 - t * 10;
-                    const amplitude = (1 - t * 0.6) * 1.4;
-                    const xPos = Math.sin(time * 20 + t * 12 + data.wigglePhase) * amplitude;
-                    posAttr.setXYZ(s, xPos, yPos, 0);
-                }
-                posAttr.needsUpdate = true;
-            }
+            // Spin the star head
+            const spin = time * 6 + data.wigglePhase;
+            if (starV) starV.rotation.y = spin;
+            if (starH) starH.rotation.y = spin;
 
             // Collision reporting
             if (mesh.position.z > -50 && mesh.position.z < 15) {
@@ -119,42 +106,47 @@ export function EnemyLasers() {
         <group ref={groupRef}>
             {Array.from({ length: MAX_LASERS }, (_, i) => (
                 <group key={i} visible={false}>
-                    {/* [0] Laser bolt core — bright red */}
-                    <mesh>
-                        <cylinderGeometry args={[0.15, 0.15, 6, 6]} />
+                    {/* [0] Vertical star point — stretched sphere */}
+                    <mesh geometry={_starPointGeo} scale={[0.2, 1.5, 0.2]} position={[0, 1, 0]}>
                         <meshStandardMaterial
                             color="#ff3300"
                             emissive="#ff2200"
-                            emissiveIntensity={10}
-                            transparent
-                            opacity={0.95}
+                            emissiveIntensity={8}
+                            transparent opacity={0.9}
                             blending={THREE.AdditiveBlending}
                         />
                     </mesh>
-                    {/* [1] Outer glow — wider */}
-                    <mesh>
-                        <cylinderGeometry args={[0.35, 0.35, 5, 6]} />
+                    {/* [1] Horizontal star point — perpendicular */}
+                    <mesh geometry={_starPointGeo} scale={[1.5, 0.2, 0.2]} position={[0, 1, 0]}>
+                        <meshStandardMaterial
+                            color="#ff3300"
+                            emissive="#ff2200"
+                            emissiveIntensity={8}
+                            transparent opacity={0.9}
+                            blending={THREE.AdditiveBlending}
+                        />
+                    </mesh>
+                    {/* [2] Tapered tail — long cone trailing behind */}
+                    <mesh geometry={_tailGeo} position={[0, -3.5, 0]}>
+                        <meshStandardMaterial
+                            color="#ff4400"
+                            emissive="#ff2200"
+                            emissiveIntensity={6}
+                            transparent opacity={0.85}
+                            blending={THREE.AdditiveBlending}
+                        />
+                    </mesh>
+                    {/* [3] Outer tail glow — softer wider */}
+                    <mesh geometry={_tailGlowGeo} position={[0, -2.5, 0]}>
                         <meshStandardMaterial
                             color="#ff6600"
                             emissive="#ff4400"
-                            emissiveIntensity={4}
-                            transparent
-                            opacity={0.3}
+                            emissiveIntensity={3}
+                            transparent opacity={0.2}
                             blending={THREE.AdditiveBlending}
                             depthWrite={false}
                         />
                     </mesh>
-                    {/* [2] Wiggling wave trail line */}
-                    <line geometry={waveGeo.clone()}>
-                        <lineBasicMaterial
-                            color="#ff4400"
-                            transparent
-                            opacity={0.8}
-                            blending={THREE.AdditiveBlending}
-                            depthWrite={false}
-                            linewidth={1}
-                        />
-                    </line>
                 </group>
             ))}
         </group>

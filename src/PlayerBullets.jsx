@@ -7,6 +7,11 @@ const MAX_BULLETS = 30;
 const BULLET_SPEED = 250;
 const BULLET_MAX_DIST = 300;
 
+// Shared geometries — created once, reused by all bullets
+const _coreGeo = new THREE.CylinderGeometry(0.4, 0.4, 5, 6);
+const _haloGeo = new THREE.CylinderGeometry(0.8, 0.8, 4, 6);
+const _auraGeo = new THREE.CylinderGeometry(1.2, 1.2, 3, 6);
+
 export function PlayerBullets() {
     const groupRef = useRef();
 
@@ -63,10 +68,11 @@ export function PlayerBullets() {
                 continue;
             }
 
-            // Check collision with enemies
+            // Check collision with enemies — larger radius when shield is up
             let hitEnemy = false;
             for (const [enemyId, enemy] of gameState.enemyPositions) {
-                if (mesh.position.distanceTo(enemy.pos) < 8.0) {
+                const hitRadius = enemy.shieldHealth > 0 ? 16.0 : 8.0;
+                if (mesh.position.distanceTo(enemy.pos) < hitRadius) {
                     hitEnemy = true;
                     window.dispatchEvent(new CustomEvent('enemy-hit', { detail: { enemyId } }));
                     data.active = false;
@@ -100,8 +106,7 @@ export function PlayerBullets() {
             {Array.from({ length: MAX_BULLETS }, (_, i) => (
                 <group key={i} visible={false}>
                     {/* Bright inner core */}
-                    <mesh>
-                        <cylinderGeometry args={[0.4, 0.4, 5, 6]} />
+                    <mesh geometry={_coreGeo}>
                         <meshStandardMaterial
                             color="#00ffff"
                             emissive="#00ffff"
@@ -112,8 +117,7 @@ export function PlayerBullets() {
                         />
                     </mesh>
                     {/* Wide glow halo */}
-                    <mesh>
-                        <cylinderGeometry args={[0.8, 0.8, 4, 6]} />
+                    <mesh geometry={_haloGeo}>
                         <meshStandardMaterial
                             color="#0088ff"
                             emissive="#0066ff"
@@ -125,8 +129,7 @@ export function PlayerBullets() {
                         />
                     </mesh>
                     {/* Outer aura */}
-                    <mesh>
-                        <cylinderGeometry args={[1.2, 1.2, 3, 6]} />
+                    <mesh geometry={_auraGeo}>
                         <meshStandardMaterial
                             color="#4400ff"
                             emissive="#2200ff"
