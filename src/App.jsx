@@ -542,7 +542,7 @@ function App() {
           [ SUPPORT THIS PROJECT ]
         </a>
         <a href="https://github.com/nikolasdoan/sdn-viz" target="_blank" rel="noopener noreferrer" className="cyber-button contribute-btn">
-          [ CONTRIBUTE ]
+          [ Github ]
         </a>
       </div>
     </div>
